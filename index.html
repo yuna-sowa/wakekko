@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>わけっこ - 割り勘アプリ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #F8F9FA;
+      color: #333333;
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    /* ========== ヘッダー / ロゴ ========== */
+    .header {
+      background: #fff;
+      text-align: center;
+      padding: 32px 16px 28px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .logo {
+      font-size: 32px;
+      font-weight: 900;
+      color: #4A90E2;
+      letter-spacing: 6px;
+    }
+    .logo-sub {
+      font-size: 13px;
+      font-weight: 500;
+      color: #888888;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+
+    /* ========== 2カラム ========== */
+    .layout {
+      display: flex;
+      gap: 24px;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 24px;
+      align-items: flex-start;
+    }
+    .col-left  { flex: 1; min-width: 0; }
+    .col-right { flex: 1; min-width: 0; position: sticky; top: 24px; }
+
+    /* ========== カード共通 ========== */
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 22px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #6A5ACD;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e8e8e8;
+      letter-spacing: 1px;
+    }
+
+    /* ========== フォーム ========== */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 120px;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .form-grid input {
+      padding: 11px 16px;
+      border: 1.5px solid #d0d5dd;
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: inherit;
+      color: #333333;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-grid input:focus {
+      border-color: #4A90E2;
+      box-shadow: 0 0 0 3px rgba(74,144,226,0.12);
+    }
+    .form-grid input::placeholder { color: #aab0b8; }
+
+    .btn-add {
+      width: 100%;
+      padding: 12px;
+      background: #4A90E2;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .btn-add:hover { background: #3a7bd0; }
+    .btn-add:active { transform: scale(0.98); }
+
+    /* ========== 商品カード ========== */
+    .item-card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.05);
+      margin-bottom: 10px;
+      border: 1px solid #e8e8e8;
+      animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .item-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .item-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #333333;
+    }
+    .item-price-badge {
+      font-size: 13px;
+      font-weight: 700;
+      color: #4A90E2;
+      background: #edf4fd;
+      padding: 3px 12px;
+      border-radius: 8px;
+      margin-left: 10px;
+    }
+    .btn-del {
+      background: #f8f9fa;
+      border: 1px solid #d0d5dd;
+      color: #999;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-del:hover {
+      background: #fef2f2;
+      border-color: #e08080;
+      color: #d04040;
+    }
+
+    /* ========== メンバー選択ピル ========== */
+    .checks {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill input { display: none; }
+    .pill label {
+      display: inline-block;
+      padding: 5px 16px;
+      border: 1.5px solid #d0d5dd;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    /* 自分: 水色 */
+    .pill input:checked + label.cl-me {
+      border-color: #4A90E2;
+      background: #edf4fd;
+      color: #2e6fc0;
+      font-weight: 700;
+    }
+    /* Aさん: グリーン */
+    .pill input:checked + label.cl-a {
+      border-color: #50b080;
+      background: #eef8f2;
+      color: #308060;
+      font-weight: 700;
+    }
+    /* Bさん: オレンジ */
+    .pill input:checked + label.cl-b {
+      border-color: #e8a040;
+      background: #fef6ea;
+      color: #b07820;
+      font-weight: 700;
+    }
+    /* Cさん: 紫 */
+    .pill input:checked + label.cl-c {
+      border-color: #6A5ACD;
+      background: #f0eef8;
+      color: #5548a8;
+      font-weight: 700;
+    }
+
+    .split-note {
+      font-size: 11px;
+      color: #999;
+      margin-top: 8px;
+    }
+    .split-note b { color: #4A90E2; }
+
+    .empty-msg {
+      text-align: center;
+      color: #aaa;
+      padding: 44px 16px;
+      font-size: 14px;
+    }
+
+    /* ========== 結果: 合計カード ========== */
+    .totals-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+    .total-box {
+      text-align: center;
+      padding: 16px 6px;
+      border-radius: 14px;
+      border: 1.5px solid transparent;
+    }
+    .total-box.me { background: #edf4fd; border-color: #c0d8f0; }
+    .total-box.a  { background: #eef8f2; border-color: #c0e0cc; }
+    .total-box.b  { background: #fef6ea; border-color: #e0d0a8; }
+    .total-box.c  { background: #f0eef8; border-color: #c8c0e0; }
+
+    .total-name {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+    .total-box.me .total-name { color: #2e6fc0; }
+    .total-box.a  .total-name { color: #308060; }
+    .total-box.b  .total-name { color: #b07820; }
+    .total-box.c  .total-name { color: #5548a8; }
+
+    .total-yen {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+    }
+    .total-box.me .total-yen { color: #2260a8; }
+    .total-box.a  .total-yen { color: #286850; }
+    .total-box.b  .total-yen { color: #906010; }
+    .total-box.c  .total-yen { color: #443890; }
+
+    /* ========== 内訳テーブル ========== */
+    .detail-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    .detail-table thead th {
+      padding: 10px 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #6A5ACD;
+      text-align: center;
+      border-bottom: 1.5px solid #e8e8e8;
+    }
+    .detail-table thead th:first-child { text-align: left; color: #555555; }
+    .detail-table thead .h-me { color: #2e6fc0; }
+    .detail-table thead .h-a  { color: #308060; }
+    .detail-table thead .h-b  { color: #b07820; }
+    .detail-table thead .h-c  { color: #5548a8; }
+
+    .detail-table tbody td {
+      padding: 9px 6px;
+      text-align: center;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .detail-table tbody tr:last-child td { border-bottom: none; }
+    .detail-table tbody td:first-child {
+      text-align: left;
+      font-weight: 700;
+      color: #333333;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .detail-table .val  { color: #333333; font-weight: 700; }
+    .detail-table .zero { color: #d0d0d0; }
+
+    .detail-table tfoot td {
+      padding: 12px 6px;
+      font-weight: 900;
+      font-size: 14px;
+      text-align: center;
+      border-top: 1.5px solid #e8e8e8;
+    }
+    .detail-table tfoot td:first-child { text-align: left; color: #555555; }
+    .detail-table tfoot .f-me { color: #2260a8; }
+    .detail-table tfoot .f-a  { color: #286850; }
+    .detail-table tfoot .f-b  { color: #906010; }
+    .detail-table tfoot .f-c  { color: #443890; }
+
+    .result-empty {
+      text-align: center;
+      color: #aaa;
+      padding: 36px 0;
+      font-size: 13px;
+    }
+
+    /* ========== クリアボタン ========== */
+    .btn-clear {
+      width: 100%;
+      padding: 11px;
+      background: #f0f0f0;
+      color: #888;
+      border: 1.5px solid #d8d8d8;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-clear:hover {
+      background: #e8e8e8;
+      border-color: #c8c8c8;
+      color: #666;
+    }
+
+    /* ========== レスポンシブ ========== */
+    @media (max-width: 720px) {
+      .layout {
+        flex-direction: column;
+        padding: 16px;
+        gap: 16px;
+      }
+      .col-right { position: static; }
+      .totals-grid { grid-template-columns: repeat(2, 1fr); }
+      .total-yen { font-size: 20px; }
+      .form-grid { grid-template-columns: 1fr 100px; }
+      .header { padding: 24px 16px 20px; }
+      .logo { font-size: 28px; letter-spacing: 4px; }
+    }
+    @media (max-width: 400px) {
+      .logo { font-size: 24px; letter-spacing: 3px; }
+      .logo-sub { font-size: 12px; }
+      .totals-grid { gap: 8px; }
+      .total-box { padding: 12px 4px; }
+      .total-yen { font-size: 17px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .detail-table { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">わけっこ</div>
+  <div class="logo-sub">みんなでかんたん割り勘</div>
+</div>
+
+<div class="layout">
+  <!-- ===== 左カラム: 入力 ===== -->
+  <div class="col-left">
+    <div class="card">
+      <div class="card-title">商品を追加</div>
+      <div class="form-grid">
+        <input type="text" id="itemName" placeholder="商品名（例: ピザ）">
+        <input type="number" id="itemPrice" placeholder="¥ 金額" min="0">
+      </div>
+      <button class="btn-add" id="btnAdd">+ 追加する</button>
+    </div>
+
+    <div id="itemList">
+      <div class="empty-msg">商品を追加すると、ここに一覧が表示されます</div>
+    </div>
+
+    <button class="btn-clear" id="btnClear">すべてクリア</button>
+  </div>
+
+  <!-- ===== 右カラム: 結果 ===== -->
+  <div class="col-right">
+    <div class="card" id="resultCard">
+      <div class="card-title">計算結果</div>
+      <div id="resultContent">
+        <div class="result-empty">商品を追加するとここに結果が表示されます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MEMBERS = [
+    { key: 'me', label: '自分', cl: 'cl-me', box: 'me', hcl: 'h-me', fcl: 'f-me' },
+    { key: 'a',  label: 'Aさん', cl: 'cl-a',  box: 'a',  hcl: 'h-a',  fcl: 'f-a'  },
+    { key: 'b',  label: 'Bさん', cl: 'cl-b',  box: 'b',  hcl: 'h-b',  fcl: 'f-b'  },
+    { key: 'c',  label: 'Cさん', cl: 'cl-c',  box: 'c',  hcl: 'h-c',  fcl: 'f-c'  },
+  ];
+
+  const items = [];
+  const $ = id => document.getElementById(id);
+
+  // --- 全角→半角変換（０-９ → 0-9） ---
+  function zenToHan(str) {
+    return str.replace(/[０-９]/g, function(c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+    }).replace(/[^0-9]/g, '');
+  }
+
+  $('itemPrice').addEventListener('compositionend', function() {
+    var raw = this.value;
+    if (raw === '') return;
+    var converted = zenToHan(String(raw));
+    if (converted) this.value = converted;
+  });
+
+  // --- 商品追加 ---
+  $('btnAdd').addEventListener('click', addItem);
+  $('itemPrice').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+  });
+  $('itemName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); $('itemPrice').focus(); }
+  });
+
+  function addItem() {
+    const name  = $('itemName').value.trim();
+    const price = parseInt($('itemPrice').value, 10);
+    if (!name)                     { $('itemName').focus();  return; }
+    if (isNaN(price) || price < 0) { $('itemPrice').focus(); return; }
+
+    const checked = {};
+    MEMBERS.forEach(m => checked[m.key] = false);
+    items.push({ id: Date.now(), name, price, checked });
+
+    $('itemName').value  = '';
+    $('itemPrice').value = '';
+    $('itemName').focus();
+    render();
+  }
+
+  // --- 削除 ---
+  function deleteItem(id) {
+    const i = items.findIndex(x => x.id === id);
+    if (i !== -1) { items.splice(i, 1); render(); }
+  }
+
+  // --- チェック切替 ---
+  function toggle(itemId, key) {
+    const item = items.find(x => x.id === itemId);
+    if (item) { item.checked[key] = !item.checked[key]; render(); }
+  }
+
+  // --- 割り勘計算 ---
+  function calcShares(item) {
+    const shares = {};
+    MEMBERS.forEach(m => shares[m.key] = 0);
+    const sel = MEMBERS.filter(m => item.checked[m.key]);
+    if (sel.length === 0) { shares.me = item.price; return shares; }
+    const base = Math.floor(item.price / sel.length);
+    const rem  = item.price % sel.length;
+    sel.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
+    return shares;
+  }
+
+  // --- ヒント ---
+  function hint(item) {
+    const sel = MEMBERS.filter(m => item.checked[m.key]);
+    if (sel.length === 0) return '<b>自分に全額加算</b>';
+    return sel.map(m => m.label).join(' + ') + ' で <b>' + sel.length + '人割り</b>';
+  }
+
+  // --- HTML エスケープ ---
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // --- 描画 ---
+  function render() {
+    if (items.length === 0) {
+      $('itemList').innerHTML = '<div class="empty-msg">商品を追加すると、ここに一覧が表示されます</div>';
+      $('resultContent').innerHTML = '<div class="result-empty">商品を追加するとここに結果が表示されます</div>';
+      return;
+    }
+
+    $('itemList').innerHTML = items.map(item => {
+      const pills = MEMBERS.map(m => {
+        const uid = 'c_' + item.id + '_' + m.key;
+        const chk = item.checked[m.key] ? 'checked' : '';
+        return '<span class="pill">'
+          + '<input type="checkbox" id="' + uid + '" ' + chk
+          + ' onchange="toggle(' + item.id + ",'" + m.key + "')" + '">'
+          + '<label for="' + uid + '" class="' + m.cl + '">' + esc(m.label) + '</label></span>';
+      }).join('');
+
+      return '<div class="item-card">'
+        + '<div class="item-top">'
+        +   '<div><span class="item-name">' + esc(item.name) + '</span>'
+        +   '<span class="item-price-badge">¥' + item.price.toLocaleString() + '</span></div>'
+        +   '<button class="btn-del" onclick="deleteItem(' + item.id + ')" title="削除">&times;</button>'
+        + '</div>'
+        + '<div class="checks">' + pills + '</div>'
+        + '<div class="split-note">' + hint(item) + '</div>'
+        + '</div>';
+    }).join('');
+
+    const totals = {};
+    MEMBERS.forEach(m => totals[m.key] = 0);
+
+    const rows = items.map(item => {
+      const sh = calcShares(item);
+      MEMBERS.forEach(m => totals[m.key] += sh[m.key]);
+      const cells = MEMBERS.map(m => {
+        const v = sh[m.key];
+        return '<td class="' + (v > 0 ? 'val' : 'zero') + '">' + (v > 0 ? '¥' + v.toLocaleString() : '-') + '</td>';
+      }).join('');
+      return '<tr><td>' + esc(item.name) + '</td>' + cells + '</tr>';
+    }).join('');
+
+    const boxes = MEMBERS.map(m =>
+      '<div class="total-box ' + m.box + '">'
+      + '<div class="total-name">' + esc(m.label) + '</div>'
+      + '<div class="total-yen">¥' + totals[m.key].toLocaleString() + '</div>'
+      + '</div>'
+    ).join('');
+
+    const ths = MEMBERS.map(m => '<th class="' + m.hcl + '">' + esc(m.label) + '</th>').join('');
+    const fts = MEMBERS.map(m => '<td class="' + m.fcl + '">¥' + totals[m.key].toLocaleString() + '</td>').join('');
+
+    $('resultContent').innerHTML =
+      '<div class="totals-grid">' + boxes + '</div>'
+      + '<table class="detail-table">'
+      + '<thead><tr><th>商品</th>' + ths + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '<tfoot><tr><td>合計</td>' + fts + '</tr></tfoot>'
+      + '</table>';
+  }
+
+  // --- クリア ---
+  $('btnClear').addEventListener('click', () => {
+    if (items.length === 0) return;
+    if (confirm('すべての商品をクリアしますか？')) { items.length = 0; render(); }
+  });
+</script>
+
+</body>
+</html>
