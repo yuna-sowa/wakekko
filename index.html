@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>わけっこ - 割り勘アプリ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F4A987">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #FFF5F5;
+      color: #333333;
+      min-height: 100vh;
+      line-height: 1.75;
+    }
+
+    /* ========== ヘッダー / ロゴ ========== */
+    .header {
+      background: #fff;
+      text-align: center;
+      padding: 40px 16px 36px;
+      border-bottom: 2px solid #FFE0E0;
+    }
+    .logo {
+      font-size: 30px;
+      font-weight: 900;
+      color: #E8707A;
+      letter-spacing: 8px;
+    }
+    .logo-sub {
+      font-size: 12px;
+      font-weight: 500;
+      color: #999;
+      margin-top: 6px;
+      letter-spacing: 2px;
+    }
+
+    /* ========== 2カラム ========== */
+    .layout {
+      display: flex;
+      gap: 32px;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 36px 32px;
+      align-items: flex-start;
+    }
+    .col-left  { flex: 1; min-width: 0; }
+    .col-right { flex: 1; min-width: 0; position: sticky; top: 36px; }
+
+    /* ========== カード共通 ========== */
+    .card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 2px 10px rgba(200,100,100,0.06);
+      margin-bottom: 28px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #E8707A;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #FFE8E8;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ========== フォーム ========== */
+    .form-grid {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .form-grid input[type="text"] {
+      flex: 1;
+      min-width: 0;
+    }
+    .form-grid input[type="number"] {
+      width: 100px;
+      flex-shrink: 0;
+    }
+    .form-grid input {
+      padding: 13px 18px;
+      border: 1.5px solid #F0D8D8;
+      border-radius: 16px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #333333;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-grid input:focus {
+      border-color: #E8707A;
+      box-shadow: 0 0 0 3px rgba(232,112,122,0.10);
+    }
+    .form-grid input::placeholder { color: #ccc; }
+
+    .btn-add {
+      width: 100%;
+      padding: 14px;
+      background: #E8707A;
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 2px;
+      transition: background 0.2s, transform 0.15s;
+      box-shadow: 0 3px 10px rgba(232,112,122,0.25);
+    }
+    .btn-add:hover { background: #D8606A; }
+    .btn-add:active { transform: scale(0.98); }
+
+    /* ========== 商品カード ========== */
+    .item-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 2px 10px rgba(200,100,100,0.06);
+      margin-bottom: 14px;
+      animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .item-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .item-top > div { min-width: 0; flex: 1; }
+    .item-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #333333;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-all;
+    }
+    .item-price-badge {
+      display: inline-block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #E8707A;
+      background: #FFF0F0;
+      padding: 4px 14px;
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+    .btn-del {
+      background: #FFF5F5;
+      border: 1px solid #F0D8D8;
+      color: #D0A8A8;
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-del:hover {
+      background: #FFE0E0;
+      border-color: #E09090;
+      color: #C05050;
+    }
+
+    /* ========== メンバー選択ピル ========== */
+    .checks {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill input { display: none; }
+    .pill label {
+      display: inline-block;
+      padding: 6px 18px;
+      border: 1.5px solid #F0D8D8;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #bbb;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    /* 自分: ピンク */
+    .pill input:checked + label.cl-me {
+      border-color: #F0A0A8;
+      background: #FFF0F0;
+      color: #C85060;
+      font-weight: 700;
+    }
+    /* Aさん: ミント */
+    .pill input:checked + label.cl-a {
+      border-color: #90C8B8;
+      background: #F0FAF6;
+      color: #408070;
+      font-weight: 700;
+    }
+    /* Bさん: ラベンダー */
+    .pill input:checked + label.cl-b {
+      border-color: #C0B0D8;
+      background: #F5F0FA;
+      color: #685088;
+      font-weight: 700;
+    }
+    /* Cさん: アプリコット */
+    .pill input:checked + label.cl-c {
+      border-color: #E8C098;
+      background: #FFF8F0;
+      color: #A87030;
+      font-weight: 700;
+    }
+
+    .split-note {
+      font-size: 11px;
+      color: #bbb;
+      margin-top: 10px;
+    }
+    .split-note b { color: #E8707A; }
+
+    .empty-msg {
+      text-align: center;
+      color: #ccc;
+      padding: 48px 16px;
+      font-size: 13px;
+    }
+
+    /* ========== 結果: 合計カード ========== */
+    .totals-grid {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+    .totals-grid::-webkit-scrollbar { display: none; }
+    .total-box {
+      flex: 1 0 auto;
+      min-width: 80px;
+      text-align: center;
+      padding: 20px 14px;
+      border-radius: 18px;
+    }
+    .total-box.me { background: #FFF0F0; }
+    .total-box.a  { background: #F0FAF6; }
+    .total-box.b  { background: #F5F0FA; }
+    .total-box.c  { background: #FFF8F0; }
+
+    .total-name {
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+    .total-box.me .total-name { color: #C85060; }
+    .total-box.a  .total-name { color: #408070; }
+    .total-box.b  .total-name { color: #685088; }
+    .total-box.c  .total-name { color: #A87030; }
+
+    .total-yen {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      white-space: nowrap;
+      color: #333333;
+    }
+
+    /* ========== 内訳テーブル ========== */
+    .detail-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    .detail-table thead th {
+      padding: 12px 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #bbb;
+      text-align: center;
+      border-bottom: 1px solid #FFE8E8;
+    }
+    .detail-table thead th:first-child { text-align: left; }
+    .detail-table thead .h-me { color: #C85060; }
+    .detail-table thead .h-a  { color: #408070; }
+    .detail-table thead .h-b  { color: #685088; }
+    .detail-table thead .h-c  { color: #A87030; }
+
+    .detail-table tbody td {
+      padding: 11px 6px;
+      text-align: center;
+      border-bottom: 1px solid #FFF0F0;
+    }
+    .detail-table tbody tr:last-child td { border-bottom: none; }
+    .detail-table tbody td:first-child {
+      text-align: left;
+      font-weight: 500;
+      color: #666666;
+      font-size: 12px;
+      max-width: 100px;
+      word-break: break-all;
+    }
+    .detail-table tbody td:first-child .cell-name {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .detail-table tbody tr.expanded td:first-child .cell-name {
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+    .detail-table tbody tr { cursor: pointer; transition: background 0.15s; }
+    .detail-table tbody tr:active { background: #FFF5F5; }
+    .detail-table .val  { color: #333333; font-weight: 700; font-size: 14px; }
+    .detail-table .zero { color: #ddd; }
+
+    .detail-table tfoot td {
+      padding: 14px 6px;
+      font-weight: 900;
+      font-size: 15px;
+      text-align: center;
+      border-top: 1px solid #FFE8E8;
+      color: #333333;
+    }
+    .detail-table tfoot td:first-child { text-align: left; color: #666666; }
+
+    .result-empty {
+      text-align: center;
+      color: #ccc;
+      padding: 40px 0;
+      font-size: 13px;
+    }
+
+    /* ========== クリアボタン ========== */
+    .btn-clear {
+      width: 100%;
+      padding: 13px;
+      background: #fff;
+      color: #bbb;
+      border: 1.5px solid #F0D8D8;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+    .btn-clear:hover {
+      background: #FFF5F5;
+      border-color: #E8B0B0;
+      color: #999;
+    }
+
+    /* ========== レスポンシブ ========== */
+    @media (max-width: 720px) {
+      .layout {
+        flex-direction: column;
+        padding: 24px 18px;
+        gap: 24px;
+      }
+      .col-right { position: static; }
+      .total-box { min-width: 72px; padding: 18px 10px; }
+      .total-yen { font-size: 22px; }
+      .form-grid { gap: 8px; }
+      .header { padding: 32px 16px 28px; }
+      .logo { font-size: 26px; letter-spacing: 6px; }
+    }
+    @media (max-width: 400px) {
+      .logo { font-size: 22px; letter-spacing: 4px; }
+      .logo-sub { font-size: 11px; }
+      .totals-grid { gap: 8px; }
+      .total-box { min-width: 68px; padding: 16px 8px; }
+      .total-yen { font-size: 20px; }
+      .form-grid { flex-wrap: wrap; }
+      .form-grid input[type="text"] { flex: 1 1 100%; }
+      .form-grid input[type="number"] { flex: 1 1 100%; width: auto; }
+      .detail-table { font-size: 12px; }
+      .detail-table .val { font-size: 13px; }
+    }
+
+    /* ========== スタート画面 ========== */
+    #screen-start {
+      min-height: 100vh;
+      background: #FAF8F4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 32px 64px;
+    }
+    #screen-main { display: none; }
+
+    .start-illustration {
+      font-size: 64px;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+    .start-logo {
+      font-size: 48px;
+      font-weight: 900;
+      color: #C9673A;
+      letter-spacing: 10px;
+      margin-bottom: 16px;
+    }
+    .start-tagline {
+      font-size: 14px;
+      font-weight: 500;
+      color: #A89080;
+      letter-spacing: 1.5px;
+      text-align: center;
+      line-height: 1.9;
+      margin-bottom: 64px;
+    }
+    .btn-start {
+      width: 100%;
+      max-width: 320px;
+      padding: 20px 24px;
+      background: #C9673A;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(201,103,58,0.30);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    }
+    .btn-start:hover {
+      background: #B8592E;
+      box-shadow: 0 8px 24px rgba(201,103,58,0.38);
+    }
+    .btn-start:active {
+      transform: scale(0.97);
+      box-shadow: 0 3px 12px rgba(201,103,58,0.25);
+    }
+    .start-footer {
+      margin-top: 40px;
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 1px;
+    }
+
+    /* ========== レシート読み込み画面 ========== */
+    #screen-upload {
+      min-height: 100vh;
+      background: #FAF8F4;
+      display: none;
+      flex-direction: column;
+    }
+    .upload-header {
+      display: flex;
+      align-items: center;
+      padding: 20px 20px 0;
+      position: relative;
+      min-height: 52px;
+    }
+    .btn-back {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      color: #B09888;
+      cursor: pointer;
+      padding: 8px 4px;
+      letter-spacing: 0.5px;
+      z-index: 1;
+    }
+    .btn-back:active { opacity: 0.6; }
+    .upload-page-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-weight: 700;
+      color: #7A5C48;
+      letter-spacing: 2.5px;
+      white-space: nowrap;
+    }
+    .upload-body {
+      flex: 1;
+      padding: 28px 24px 56px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    /* 選択前: プレースホルダーゾーン */
+    .upload-zone {
+      display: block;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      max-height: 52vh;
+      border: 2px dashed #D4C4B8;
+      border-radius: 24px;
+      background: #FFFAF7;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover       { border-color: #C9673A; background: #FFF6EF; }
+    .upload-zone.has-image   { border-style: solid; border-color: #C9673A; }
+    .upload-zone-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: opacity 0.2s;
+    }
+    .upload-zone.has-image .upload-zone-placeholder { opacity: 0; pointer-events: none; }
+    .upload-zone-icon  { font-size: 52px; line-height: 1; }
+    .upload-zone-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #B09888;
+      letter-spacing: 1.5px;
+    }
+    .upload-zone-sub {
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 0.8px;
+    }
+    /* プレビュー画像 */
+    .preview-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .upload-zone.has-image .preview-img { display: block; }
+    /* 選択済みバッジ */
+    .preview-badge {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      background: rgba(201,103,58,0.88);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: none;
+    }
+    .upload-zone.has-image .preview-badge { display: block; }
+    /* ライブラリ / カメラ ボタン行 */
+    .upload-btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .btn-upload-opt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 18px 12px;
+      background: #fff;
+      border: 1.5px solid #E8D8CC;
+      border-radius: 20px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      color: #8A6858;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(180,130,100,0.06);
+    }
+    .btn-upload-opt:hover  { background: #FFF5EE; border-color: #C9673A; color: #C9673A; }
+    .btn-upload-opt:active { transform: scale(0.97); }
+    .btn-upload-opt-icon   { font-size: 26px; line-height: 1; }
+    /* 解析ボタン */
+    .btn-analyze {
+      width: 100%;
+      padding: 20px 24px;
+      background: #C9673A;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(201,103,58,0.30);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      margin-top: 4px;
+    }
+    .btn-analyze:disabled {
+      background: #D4C4B8;
+      box-shadow: none;
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+    .btn-analyze:not(:disabled):hover  { background: #B8592E; box-shadow: 0 8px 24px rgba(201,103,58,0.38); }
+    .btn-analyze:not(:disabled):active { transform: scale(0.97); box-shadow: 0 3px 12px rgba(201,103,58,0.22); }
+    .upload-note {
+      text-align: center;
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 0.5px;
+      line-height: 1.8;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ========== スタート画面 ========== -->
+<div id="screen-start">
+  <div class="start-illustration">🧾</div>
+  <div class="start-logo">わけっこ</div>
+  <div class="start-tagline">レシートを読み込んで<br>かんたん割り勘</div>
+  <button class="btn-start" id="btnGoUpload">レシートを読み込む</button>
+  <input type="file" id="startCameraInput" accept="image/*" capture="environment" style="display:none">
+  <div class="start-footer">まずはレシートの写真を用意してね</div>
+</div>
+
+<!-- ========== レシート読み込み画面 ========== -->
+<div id="screen-upload">
+  <div class="upload-header">
+    <button class="btn-back" id="btnBack">← もどる</button>
+    <div class="upload-page-title">レシートを読み込む</div>
+  </div>
+
+  <div class="upload-body">
+    <!-- アップロードゾーン（ライブラリ用） -->
+    <label class="upload-zone" id="uploadZone" for="fileInput">
+      <div class="upload-zone-placeholder">
+        <div class="upload-zone-icon">🧾</div>
+        <div class="upload-zone-label">タップして画像を選択</div>
+        <div class="upload-zone-sub">JPG · PNG · HEIC に対応</div>
+      </div>
+      <img class="preview-img" id="previewImg" alt="プレビュー">
+      <div class="preview-badge">✓ 選択済み</div>
+    </label>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <!-- カメラ専用 input（capture） -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+
+    <!-- サブボタン行 -->
+    <div class="upload-btn-row">
+      <button class="btn-upload-opt" id="btnLibrary">
+        <span class="btn-upload-opt-icon">🖼️</span>
+        <span>ライブラリから</span>
+      </button>
+      <button class="btn-upload-opt" id="btnCamera">
+        <span class="btn-upload-opt-icon">📷</span>
+        <span>写真を撮る</span>
+      </button>
+    </div>
+
+    <!-- 解析ボタン -->
+    <button class="btn-analyze" id="btnAnalyze" disabled>解析する</button>
+    <p class="upload-note">レシート全体が映るように撮影してください</p>
+  </div>
+</div>
+
+<!-- ========== メイン画面 ========== -->
+<div id="screen-main">
+<div class="header">
+  <div class="logo">わけっこ</div>
+  <div class="logo-sub">みんなでかんたん割り勘</div>
+</div>
+
+<div class="layout">
+  <!-- ===== 左カラム: 入力 ===== -->
+  <div class="col-left">
+    <div class="card">
+      <div class="card-title">商品を追加</div>
+      <div class="form-grid">
+        <input type="text" id="itemName" placeholder="商品名（例: ピザ）">
+        <input type="number" id="itemPrice" placeholder="¥ 金額" min="0">
+      </div>
+      <button class="btn-add" id="btnAdd">+ 追加する</button>
+    </div>
+
+    <div id="itemList">
+      <div class="empty-msg">商品を追加すると、ここに一覧が表示されます</div>
+    </div>
+
+    <button class="btn-clear" id="btnClear">すべてクリア</button>
+  </div>
+
+  <!-- ===== 右カラム: 結果 ===== -->
+  <div class="col-right">
+    <div class="card" id="resultCard">
+      <div class="card-title">計算結果</div>
+      <div id="resultContent">
+        <div class="result-empty">商品を追加するとここに結果が表示されます</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MEMBERS = [
+    { key: 'me', label: '自分', cl: 'cl-me', box: 'me', hcl: 'h-me', fcl: 'f-me' },
+    { key: 'a',  label: 'Aさん', cl: 'cl-a',  box: 'a',  hcl: 'h-a',  fcl: 'f-a'  },
+    { key: 'b',  label: 'Bさん', cl: 'cl-b',  box: 'b',  hcl: 'h-b',  fcl: 'f-b'  },
+    { key: 'c',  label: 'Cさん', cl: 'cl-c',  box: 'c',  hcl: 'h-c',  fcl: 'f-c'  },
+  ];
+
+  const items = [];
+  const $ = id => document.getElementById(id);
+
+  // --- 全角→半角変換（０-９ → 0-9） ---
+  function zenToHan(str) {
+    return str.replace(/[０-９]/g, function(c) {
+      return String.fromCharCode(c.charCodeAt(0) - 0xFEE0);
+    }).replace(/[^0-9]/g, '');
+  }
+
+  $('itemPrice').addEventListener('compositionend', function() {
+    var raw = this.value;
+    if (raw === '') return;
+    var converted = zenToHan(String(raw));
+    if (converted) this.value = converted;
+  });
+
+  // --- 商品追加 ---
+  $('btnAdd').addEventListener('click', addItem);
+  $('itemPrice').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+  });
+  $('itemName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); $('itemPrice').focus(); }
+  });
+
+  function addItem() {
+    const name  = $('itemName').value.trim();
+    const price = parseInt($('itemPrice').value, 10);
+    if (!name)                     { $('itemName').focus();  return; }
+    if (isNaN(price) || price < 0) { $('itemPrice').focus(); return; }
+
+    const checked = {};
+    MEMBERS.forEach(m => checked[m.key] = false);
+    items.push({ id: Date.now(), name, price, checked });
+
+    $('itemName').value  = '';
+    $('itemPrice').value = '';
+    $('itemName').focus();
+    render();
+  }
+
+  // --- 削除 ---
+  function deleteItem(id) {
+    const i = items.findIndex(x => x.id === id);
+    if (i !== -1) { items.splice(i, 1); render(); }
+  }
+
+  // --- チェック切替 ---
+  function toggle(itemId, key) {
+    const item = items.find(x => x.id === itemId);
+    if (item) { item.checked[key] = !item.checked[key]; render(); }
+  }
+
+  // --- 割り勘計算 ---
+  function calcShares(item) {
+    const shares = {};
+    MEMBERS.forEach(m => shares[m.key] = 0);
+    const sel = MEMBERS.filter(m => item.checked[m.key]);
+    if (sel.length === 0) { shares.me = item.price; return shares; }
+    const base = Math.floor(item.price / sel.length);
+    const rem  = item.price % sel.length;
+    sel.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
+    return shares;
+  }
+
+  // --- ヒント ---
+  function hint(item) {
+    const sel = MEMBERS.filter(m => item.checked[m.key]);
+    if (sel.length === 0) return '<b>自分に全額加算</b>';
+    return sel.map(m => m.label).join(' + ') + ' で <b>' + sel.length + '人割り</b>';
+  }
+
+  // --- HTML エスケープ ---
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // --- 描画 ---
+  function render() {
+    if (items.length === 0) {
+      $('itemList').innerHTML = '<div class="empty-msg">商品を追加すると、ここに一覧が表示されます</div>';
+      $('resultContent').innerHTML = '<div class="result-empty">商品を追加するとここに結果が表示されます</div>';
+      return;
+    }
+
+    $('itemList').innerHTML = items.map(item => {
+      const pills = MEMBERS.map(m => {
+        const uid = 'c_' + item.id + '_' + m.key;
+        const chk = item.checked[m.key] ? 'checked' : '';
+        return '<span class="pill">'
+          + '<input type="checkbox" id="' + uid + '" ' + chk
+          + ' onchange="toggle(' + item.id + ",'" + m.key + "')" + '">'
+          + '<label for="' + uid + '" class="' + m.cl + '">' + esc(m.label) + '</label></span>';
+      }).join('');
+
+      return '<div class="item-card">'
+        + '<div class="item-top">'
+        +   '<div><div class="item-name">' + esc(item.name) + '</div>'
+        +   '<span class="item-price-badge">¥' + item.price.toLocaleString() + '</span></div>'
+        +   '<button class="btn-del" onclick="deleteItem(' + item.id + ')" title="削除">&times;</button>'
+        + '</div>'
+        + '<div class="checks">' + pills + '</div>'
+        + '<div class="split-note">' + hint(item) + '</div>'
+        + '</div>';
+    }).join('');
+
+    const totals = {};
+    MEMBERS.forEach(m => totals[m.key] = 0);
+
+    const rows = items.map(item => {
+      const sh = calcShares(item);
+      MEMBERS.forEach(m => totals[m.key] += sh[m.key]);
+      const cells = MEMBERS.map(m => {
+        const v = sh[m.key];
+        return '<td class="' + (v > 0 ? 'val' : 'zero') + '">' + (v > 0 ? '¥' + v.toLocaleString() : '-') + '</td>';
+      }).join('');
+      return '<tr onclick="this.classList.toggle(\'expanded\')"><td><span class="cell-name">' + esc(item.name) + '</span></td>' + cells + '</tr>';
+    }).join('');
+
+    const boxes = MEMBERS.map(m =>
+      '<div class="total-box ' + m.box + '">'
+      + '<div class="total-name">' + esc(m.label) + '</div>'
+      + '<div class="total-yen">¥' + totals[m.key].toLocaleString() + '</div>'
+      + '</div>'
+    ).join('');
+
+    const ths = MEMBERS.map(m => '<th class="' + m.hcl + '">' + esc(m.label) + '</th>').join('');
+    const fts = MEMBERS.map(m => '<td class="' + m.fcl + '">¥' + totals[m.key].toLocaleString() + '</td>').join('');
+
+    $('resultContent').innerHTML =
+      '<div class="totals-grid">' + boxes + '</div>'
+      + '<table class="detail-table">'
+      + '<thead><tr><th>商品</th>' + ths + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '<tfoot><tr><td>合計</td>' + fts + '</tr></tfoot>'
+      + '</table>';
+  }
+
+  // --- クリア ---
+  $('btnClear').addEventListener('click', () => {
+    if (items.length === 0) return;
+    if (confirm('すべての商品をクリアしますか？')) { items.length = 0; render(); }
+  });
+
+  // --- 画面切替ヘルパー ---
+  function showScreen(id) {
+    ['screen-start', 'screen-upload', 'screen-main'].forEach(s => {
+      const el = $(s);
+      if (el) el.style.display = 'none';
+    });
+    const target = $(id);
+    if (target) {
+      target.style.display = (id === 'screen-upload') ? 'flex' : 'block';
+    }
+  }
+
+  // --- スタート: ボタン押下でカメラ直起動 ---
+  $('btnGoUpload').addEventListener('click', () => $('startCameraInput').click());
+
+  $('startCameraInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) analyzeReceipt(file);
+  });
+
+  function analyzeReceipt(file) {
+    // TODO: OCR処理をここに実装
+    showScreen('screen-main');
+  }
+
+  // --- アップロード → スタート（戻る） ---
+  $('btnBack').addEventListener('click', () => showScreen('screen-start'));
+
+  // --- 画像プレビュー共通処理 ---
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      $('previewImg').src = e.target.result;
+      $('uploadZone').classList.add('has-image');
+      $('btnAnalyze').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ライブラリ input
+  $('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // カメラ input
+  $('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // ライブラリボタン
+  $('btnLibrary').addEventListener('click', () => $('fileInput').click());
+
+  // カメラボタン
+  $('btnCamera').addEventListener('click', () => $('cameraInput').click());
+
+  // --- アップロード → メイン（解析する） ---
+  $('btnAnalyze').addEventListener('click', () => showScreen('screen-main'));
+</script>
+
+</div><!-- /screen-main -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+    .then(() => console.log('Service Worker Registered'));
+  }
+</script>
+</body>
+</html>
