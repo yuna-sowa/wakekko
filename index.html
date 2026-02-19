@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#F4A987">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -400,10 +402,297 @@
       .detail-table { font-size: 12px; }
       .detail-table .val { font-size: 13px; }
     }
+
+    /* ========== スタート画面 ========== */
+    #screen-start {
+      min-height: 100vh;
+      background: #FAF8F4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 32px 64px;
+    }
+    #screen-main { display: none; }
+
+    .start-illustration {
+      font-size: 64px;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+    .start-logo {
+      font-size: 48px;
+      font-weight: 900;
+      color: #C9673A;
+      letter-spacing: 10px;
+      margin-bottom: 16px;
+    }
+    .start-tagline {
+      font-size: 14px;
+      font-weight: 500;
+      color: #A89080;
+      letter-spacing: 1.5px;
+      text-align: center;
+      line-height: 1.9;
+      margin-bottom: 64px;
+    }
+    .btn-start {
+      width: 100%;
+      max-width: 320px;
+      padding: 20px 24px;
+      background: #C9673A;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(201,103,58,0.30);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    }
+    .btn-start:hover {
+      background: #B8592E;
+      box-shadow: 0 8px 24px rgba(201,103,58,0.38);
+    }
+    .btn-start:active {
+      transform: scale(0.97);
+      box-shadow: 0 3px 12px rgba(201,103,58,0.25);
+    }
+    .start-footer {
+      margin-top: 40px;
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 1px;
+    }
+
+    /* ========== レシート読み込み画面 ========== */
+    #screen-upload {
+      min-height: 100vh;
+      background: #FAF8F4;
+      display: none;
+      flex-direction: column;
+    }
+    .upload-header {
+      display: flex;
+      align-items: center;
+      padding: 20px 20px 0;
+      position: relative;
+      min-height: 52px;
+    }
+    .btn-back {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      color: #B09888;
+      cursor: pointer;
+      padding: 8px 4px;
+      letter-spacing: 0.5px;
+      z-index: 1;
+    }
+    .btn-back:active { opacity: 0.6; }
+    .upload-page-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-weight: 700;
+      color: #7A5C48;
+      letter-spacing: 2.5px;
+      white-space: nowrap;
+    }
+    .upload-body {
+      flex: 1;
+      padding: 28px 24px 56px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    /* 選択前: プレースホルダーゾーン */
+    .upload-zone {
+      display: block;
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      max-height: 52vh;
+      border: 2px dashed #D4C4B8;
+      border-radius: 24px;
+      background: #FFFAF7;
+      cursor: pointer;
+      overflow: hidden;
+      position: relative;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover       { border-color: #C9673A; background: #FFF6EF; }
+    .upload-zone.has-image   { border-style: solid; border-color: #C9673A; }
+    .upload-zone-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: opacity 0.2s;
+    }
+    .upload-zone.has-image .upload-zone-placeholder { opacity: 0; pointer-events: none; }
+    .upload-zone-icon  { font-size: 52px; line-height: 1; }
+    .upload-zone-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #B09888;
+      letter-spacing: 1.5px;
+    }
+    .upload-zone-sub {
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 0.8px;
+    }
+    /* プレビュー画像 */
+    .preview-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .upload-zone.has-image .preview-img { display: block; }
+    /* 選択済みバッジ */
+    .preview-badge {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      background: rgba(201,103,58,0.88);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: none;
+    }
+    .upload-zone.has-image .preview-badge { display: block; }
+    /* ライブラリ / カメラ ボタン行 */
+    .upload-btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .btn-upload-opt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 18px 12px;
+      background: #fff;
+      border: 1.5px solid #E8D8CC;
+      border-radius: 20px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      color: #8A6858;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(180,130,100,0.06);
+    }
+    .btn-upload-opt:hover  { background: #FFF5EE; border-color: #C9673A; color: #C9673A; }
+    .btn-upload-opt:active { transform: scale(0.97); }
+    .btn-upload-opt-icon   { font-size: 26px; line-height: 1; }
+    /* 解析ボタン */
+    .btn-analyze {
+      width: 100%;
+      padding: 20px 24px;
+      background: #C9673A;
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(201,103,58,0.30);
+      transition: background 0.2s, transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+      margin-top: 4px;
+    }
+    .btn-analyze:disabled {
+      background: #D4C4B8;
+      box-shadow: none;
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+    .btn-analyze:not(:disabled):hover  { background: #B8592E; box-shadow: 0 8px 24px rgba(201,103,58,0.38); }
+    .btn-analyze:not(:disabled):active { transform: scale(0.97); box-shadow: 0 3px 12px rgba(201,103,58,0.22); }
+    .upload-note {
+      text-align: center;
+      font-size: 11px;
+      color: #C8B8B0;
+      letter-spacing: 0.5px;
+      line-height: 1.8;
+    }
   </style>
 </head>
 <body>
 
+<!-- ========== スタート画面 ========== -->
+<div id="screen-start">
+  <div class="start-illustration">🧾</div>
+  <div class="start-logo">わけっこ</div>
+  <div class="start-tagline">レシートを読み込んで<br>かんたん割り勘</div>
+  <button class="btn-start" id="btnGoUpload">レシートを読み込む</button>
+  <input type="file" id="startCameraInput" accept="image/*" capture="environment" style="display:none">
+  <div class="start-footer">まずはレシートの写真を用意してね</div>
+</div>
+
+<!-- ========== レシート読み込み画面 ========== -->
+<div id="screen-upload">
+  <div class="upload-header">
+    <button class="btn-back" id="btnBack">← もどる</button>
+    <div class="upload-page-title">レシートを読み込む</div>
+  </div>
+
+  <div class="upload-body">
+    <!-- アップロードゾーン（ライブラリ用） -->
+    <label class="upload-zone" id="uploadZone" for="fileInput">
+      <div class="upload-zone-placeholder">
+        <div class="upload-zone-icon">🧾</div>
+        <div class="upload-zone-label">タップして画像を選択</div>
+        <div class="upload-zone-sub">JPG · PNG · HEIC に対応</div>
+      </div>
+      <img class="preview-img" id="previewImg" alt="プレビュー">
+      <div class="preview-badge">✓ 選択済み</div>
+    </label>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <!-- カメラ専用 input（capture） -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
+
+    <!-- サブボタン行 -->
+    <div class="upload-btn-row">
+      <button class="btn-upload-opt" id="btnLibrary">
+        <span class="btn-upload-opt-icon">🖼️</span>
+        <span>ライブラリから</span>
+      </button>
+      <button class="btn-upload-opt" id="btnCamera">
+        <span class="btn-upload-opt-icon">📷</span>
+        <span>写真を撮る</span>
+      </button>
+    </div>
+
+    <!-- 解析ボタン -->
+    <button class="btn-analyze" id="btnAnalyze" disabled>解析する</button>
+    <p class="upload-note">レシート全体が映るように撮影してください</p>
+  </div>
+</div>
+
+<!-- ========== メイン画面 ========== -->
+<div id="screen-main">
 <div class="header">
   <div class="logo">わけっこ</div>
   <div class="logo-sub">みんなでかんたん割り勘</div>
@@ -589,7 +878,69 @@
     if (items.length === 0) return;
     if (confirm('すべての商品をクリアしますか？')) { items.length = 0; render(); }
   });
+
+  // --- 画面切替ヘルパー ---
+  function showScreen(id) {
+    ['screen-start', 'screen-upload', 'screen-main'].forEach(s => {
+      const el = $(s);
+      if (el) el.style.display = 'none';
+    });
+    const target = $(id);
+    if (target) {
+      target.style.display = (id === 'screen-upload') ? 'flex' : 'block';
+    }
+  }
+
+  // --- スタート: ボタン押下でカメラ直起動 ---
+  $('btnGoUpload').addEventListener('click', () => $('startCameraInput').click());
+
+  $('startCameraInput').addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) analyzeReceipt(file);
+  });
+
+  function analyzeReceipt(file) {
+    // TODO: OCR処理をここに実装
+    showScreen('screen-main');
+  }
+
+  // --- アップロード → スタート（戻る） ---
+  $('btnBack').addEventListener('click', () => showScreen('screen-start'));
+
+  // --- 画像プレビュー共通処理 ---
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      $('previewImg').src = e.target.result;
+      $('uploadZone').classList.add('has-image');
+      $('btnAnalyze').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ライブラリ input
+  $('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // カメラ input
+  $('cameraInput').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  // ライブラリボタン
+  $('btnLibrary').addEventListener('click', () => $('fileInput').click());
+
+  // カメラボタン
+  $('btnCamera').addEventListener('click', () => $('cameraInput').click());
+
+  // --- アップロード → メイン（解析する） ---
+  $('btnAnalyze').addEventListener('click', () => showScreen('screen-main'));
 </script>
 
+</div><!-- /screen-main -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js')
+    .then(() => console.log('Service Worker Registered'));
+  }
+</script>
 </body>
 </html>

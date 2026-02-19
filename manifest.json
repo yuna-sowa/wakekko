@@ -1,0 +1,20 @@
+{
+  "name": "わけっこ",
+  "short_name": "わけっこ",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFF8F4",
+  "theme_color": "#F4A987",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
