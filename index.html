@@ -924,29 +924,68 @@
   }
 
   /**
-   * OCR テキストから「商品名 + 金額」の行を抽出する。
-   * 対応パターン例: "ビール 500" / "ピザ ¥1,200" / "鍋 2000円"
+   * OCR テキストから商品名と価格を抽出・整形する。
+   *
+   * 処理フロー:
+   *   1. 全角数字/スペースを半角に統一
+   *   2. 合計・税額など商品以外の行をスキップ
+   *   3. 行末の 2〜4 桁（またはカンマ区切り）の価格を抽出
+   *   4. 商品名のノイズ除去:
+   *      ① 先頭の JAN コード（8〜13 桁）
+   *      ② 「0000※」「00001 」のような短い数字コード
+   *      ③ 先頭に残った孤立した数字列
+   *      ④ 不要な記号（※ \ × ☆ ● など）
+   *      ⑤ 先頭・末尾の非文字ノイズ
+   *      ⑥ 連続スペースを整理
    */
   function parseReceiptItems(text) {
     const seen    = new Set();
     const results = [];
 
+    // 合計・税額・釣銭など商品行でない行を除外するパターン
+    const SKIP = /小計|合計|内税|外税|消費税|税額|お釣|つり|お預|ご利用|ポイント|割引|値引|クーポン|支払/;
+
     for (const raw of text.split('\n')) {
-      const line = raw.trim();
+      // 全角数字・全角スペースを半角に統一
+      const line = raw
+        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+        .replace(/　/g, ' ')
+        .trim();
+
       if (!line) continue;
+      if (SKIP.test(line)) continue;
 
-      const m = line.match(/^(.+?)\s+[¥￥]?\s*([0-9０-９][0-9０-９,，]*)\s*円?\s*$/);
-      if (!m) continue;
+      // 行末の価格を抽出（2〜4 桁、またはカンマ区切り例: 1,200）
+      const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,4})\s*円?\s*$/);
+      if (!priceMatch) continue;
 
-      const name = m[1].replace(/[*＊※○●◆▶]+/g, '').trim();
-      const price = parseInt(
-        m[2]
-          .replace(/[,，]/g, '')
-          .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)),
-        10
-      );
+      const price = parseInt(priceMatch[1].replace(',', ''), 10);
+      if (price < 10 || price >= 100_000) continue;
 
-      if (!name || isNaN(price) || price <= 0 || price >= 1_000_000) continue;
+      // 価格部分を除いた残りを商品名候補に
+      let name = line.slice(0, line.length - priceMatch[0].length).trim();
+
+      // ① 先頭の JAN コード（8〜13 桁の連続数字）を除去
+      name = name.replace(/^\d{8,13}\s*/, '');
+
+      // ② 「0000※」「00001 」のような短い数字コードを除去
+      name = name.replace(/^\d{3,7}[※\s]\s*/, '');
+
+      // ③ 先頭に残った孤立した数字（スペース区切り）を除去
+      name = name.replace(/^\d+\s+/, '');
+
+      // ④ 不要な記号を除去（※ \ ＼ × ÷ ☆ ★ ● ○ ■ ◆ ▶ | など）
+      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, '');
+
+      // ⑤ 先頭・末尾の非文字ノイズを除去（日本語・英数字以外の記号）
+      name = name
+        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')
+        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');
+
+      // ⑥ 連続スペースを整理
+      name = name.replace(/\s{2,}/g, ' ').trim();
+
+      if (!name) continue;
 
       const key = `${name}:${price}`;
       if (seen.has(key)) continue;
