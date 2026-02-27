@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#F4A987">
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -796,6 +795,11 @@
 <script>
   /* ================================================================
      わけっこ — メインロジック
+     ----------------------------------------------------------------
+     OCR エンジン: Google Cloud Vision API (TEXT_DETECTION)
+     APIキーの渡し方: URL パラメータ ?APIkey=YOUR_KEY
+       例) https://yuna-sowa.github.io/wakekko/?APIkey=AIzaSy...
+           http://localhost:8080/?APIkey=AIzaSy...
      ================================================================ */
 
   // ── 定数・状態 ────────────────────────────────────────────────
@@ -811,12 +815,15 @@
   let selectedFile = null;
 
   // ── ユーティリティ ────────────────────────────────────────────
+
+  // XSS 対策: ユーザー入力や外部テキストを innerHTML に埋め込む前にエスケープする
   function esc(s) {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML;
   }
 
+  // 全角数字（IME 変換後など）を半角に統一して数値だけ返す
   function zenToHan(str) {
     return str
       .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
@@ -834,15 +841,16 @@
   }
 
   // ── OCR ──────────────────────────────────────────────────────
+
   /**
-   * ファイルを受け取り、プレビュー表示と OCR を同時に開始する。
-   * fileInput / cameraInput / startCameraInput すべてからここを呼ぶ。
+   * 画像ファイルを受け取り、プレビュー表示と OCR を開始する。
+   * fileInput / cameraInput / startCameraInput の change イベントから呼ぶ共通エントリ。
    */
   function handleFile(file) {
     if (!file || !file.type.startsWith('image/')) return;
     selectedFile = file;
 
-    // プレビュー表示
+    // プレビュー表示（FileReader で data URL に変換して <img> に渡す）
     const reader = new FileReader();
     reader.onload = e => {
       $('previewImg').src = e.target.result;
@@ -850,12 +858,34 @@
     };
     reader.readAsDataURL(file);
 
-    // OCR 自動開始
     analyzeReceipt(file);
   }
 
   /**
-   * Tesseract.js（日本語）で OCR を実行し、結果を画面に表示する。
+   * 画像ファイルを純粋な Base64 文字列に変換する。
+   * Vision API のリクエストボディに埋め込むため、data:... プレフィックスは除去する。
+   */
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = e => resolve(e.target.result.split(',')[1]); // "data:image/...;base64," を除去
+      reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Google Cloud Vision API（TEXT_DETECTION）で OCR を実行し、結果を画面に表示する。
+   *
+   * APIキーは URL パラメータ ?APIkey=... から取得する。
+   * キーが未指定の場合はエラーメッセージを表示して処理を中断する。
+   *
+   * 処理フロー:
+   *   1. URLSearchParams から APIキーを取得
+   *   2. 画像を Base64 に変換
+   *   3. Vision API に POST → fullTextAnnotation.text を取得
+   *   4. parseReceiptItems() でテキストから商品・金額を抽出
+   *   5. 結果を画面に表示し、割り勘リストへ追加するボタンを出す
    */
   async function analyzeReceipt(file) {
     const btnAnalyze = $('btnAnalyze');
@@ -873,20 +903,43 @@
     btnGoMain.style.display = 'none';
 
     try {
-      const { data: { text } } = await Tesseract.recognize(file, 'jpn', {
-        logger: ({ status, progress }) => {
-          if (status === 'recognizing text') {
-            const pct = Math.round(progress * 100);
-            btnAnalyze.textContent = `解析中… ${pct}%`;
-            ocrText.textContent    = `解析しています… ${pct}%`;
-          }
-        },
+      // 1. URLパラメータから APIキーを取得
+      const apiKey = new URLSearchParams(window.location.search).get('APIkey');
+      if (!apiKey) {
+        throw new Error('APIキーが指定されていません。URLに ?APIkey=YOUR_KEY を追加してください。');
+      }
+
+      // 2. 画像を Base64 に変換
+      const base64Image = await fileToBase64(file);
+
+      // 3. Vision API へ POST
+      const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image:    { content: base64Image },
+            features: [{ type: 'TEXT_DETECTION' }],
+          }],
+        }),
       });
 
-      // 生テキスト表示
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        const msg = err?.error?.message ?? `HTTP ${response.status}`;
+        throw new Error(`Vision API エラー: ${msg}`);
+      }
+
+      // 4. fullTextAnnotation.text を取得
+      const data       = await response.json();
+      const annotation = data?.responses?.[0]?.fullTextAnnotation;
+      const text       = annotation?.text ?? '';
+
+      // 生テキストをそのまま表示（デバッグ・確認用）
       ocrText.textContent = text.trim() || '（テキストを検出できませんでした）';
 
-      // 商品・金額のパース
+      // 5. 商品・金額をパースして一覧化
       const parsed = parseReceiptItems(text);
 
       if (parsed.length > 0) {
@@ -915,8 +968,9 @@
         btnGoMain.style.display = 'block';
         btnGoMain.onclick       = () => showScreen('screen-main');
       }
-    } catch {
-      ocrText.textContent = 'OCRエラーが発生しました。もう一度お試しください。';
+    } catch (err) {
+      ocrText.textContent = `エラー: ${err.message ?? 'OCR処理に失敗しました。もう一度お試しください。'}`;
+      ocrResult.style.display = 'block';
     } finally {
       btnAnalyze.disabled    = false;
       btnAnalyze.textContent = '再解析する';
@@ -996,7 +1050,7 @@
     return results;
   }
 
-  // ── 商品リスト ────────────────────────────────────────────────
+  // ── 商品リスト操作 ────────────────────────────────────────────
   function addItem() {
     const name  = $('itemName').value.trim();
     const price = parseInt($('itemPrice').value, 10);
@@ -1023,6 +1077,9 @@
     if (item) { item.checked[key] = !item.checked[key]; render(); }
   }
 
+  // 各メンバーの負担額を計算する。
+  // 1円未満の端数は先頭のメンバーから順に1円ずつ上乗せして完全に分配する。
+  // チェックなしの場合は「自分」に全額を加算する。
   function calcShares(item) {
     const shares = {};
     MEMBERS.forEach(m => (shares[m.key] = 0));
@@ -1034,6 +1091,7 @@
     return shares;
   }
 
+  // 商品カードに表示する割り勘ヒント文を返す
   function hint(item) {
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) return '<b>自分に全額加算</b>';
@@ -1106,44 +1164,44 @@
 
   // ── イベントリスナー ──────────────────────────────────────────
 
-  // 全角数字の半角変換
+  // IME 確定後に全角数字を半角に自動変換（スマホ日本語キーボード対策）
   $('itemPrice').addEventListener('compositionend', function () {
     const converted = zenToHan(this.value);
     if (converted) this.value = converted;
   });
 
-  // 商品追加
+  // 商品を追加 / Enter キーでフォーカス移動
   $('btnAdd').addEventListener('click', addItem);
   $('itemPrice').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } });
   $('itemName').addEventListener('keydown',  e => { if (e.key === 'Enter') { e.preventDefault(); $('itemPrice').focus(); } });
 
-  // クリア
+  // 全商品クリア（確認ダイアログあり）
   $('btnClear').addEventListener('click', () => {
     if (items.length === 0) return;
     if (confirm('すべての商品をクリアしますか？')) { items.length = 0; render(); }
   });
 
-  // 画面遷移
+  // もどるボタン → スタート画面へ
   $('btnBack').addEventListener('click', () => showScreen('screen-start'));
 
-  // スタート画面 → カメラ起動
+  // スタート画面の「レシートを読み込む」→ カメラ起動
   $('btnGoUpload').addEventListener('click', () => $('startCameraInput').click());
 
-  // カメラ撮影後 → screen-upload を表示して OCR 自動開始
+  // スタート画面でカメラ撮影 → アップロード画面を開いて OCR 自動開始
   $('startCameraInput').addEventListener('change', e => {
     const file = e.target.files[0];
     if (file) { showScreen('screen-upload'); handleFile(file); }
   });
 
-  // ライブラリ / カメラ ボタン
+  // アップロード画面のサブボタン（ライブラリ / カメラ）
   $('btnLibrary').addEventListener('click', () => $('fileInput').click());
   $('btnCamera').addEventListener('click',  () => $('cameraInput').click());
 
-  // ファイル選択 → OCR 自動開始
+  // ファイル選択 → プレビュー表示 & OCR 自動開始
   $('fileInput').addEventListener('change',   e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
   $('cameraInput').addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
 
-  // 再解析ボタン（OCR 完了後に「再解析する」として機能）
+  // 「再解析する」ボタン（OCR 完了後に有効になる）
   $('btnAnalyze').addEventListener('click', () => {
     if (selectedFile) analyzeReceipt(selectedFile);
   });
@@ -1151,9 +1209,11 @@
 
 </div><!-- /screen-main -->
 <script>
+  // Service Worker を登録してオフライン対応・PWA インストールを有効にする。
+  // HTTPS（GitHub Pages）または localhost でのみ動作する。
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js')
-    .then(() => console.log('Service Worker Registered'));
+      .then(() => console.log('Service Worker registered'));
   }
 </script>
 </body>
