@@ -813,6 +813,7 @@
   const items = [];
   const $ = id => document.getElementById(id);
   let selectedFile = null;
+  let currentParsedResult = null; // OCR解析結果を保持するグローバル変数
 
   // ── ユーティリティ ────────────────────────────────────────────
 
@@ -940,14 +941,14 @@
       ocrText.textContent = text.trim() || '（テキストを検出できませんでした）';
 
       // 5. 商品・金額・店名・合計をパースして一覧化
-      const parsed = parseReceiptItems(text);
+      currentParsedResult = parseReceiptItems(text); // グローバルに保持
 
-      if (parsed.items.length > 0) {
+      if (currentParsedResult.items.length > 0) {
         const metaRows = [
-          parsed.storeName   ? `<div class="ocr-parsed-item ocr-meta"><span>店名</span><span>${esc(parsed.storeName)}</span></div>` : '',
-          parsed.totalAmount ? `<div class="ocr-parsed-item ocr-meta"><span>合計</span><span>¥${parsed.totalAmount.toLocaleString()}</span></div>` : '',
+          currentParsedResult.storeName   ? `<div class="ocr-parsed-item ocr-meta"><span>店名</span><span>${esc(currentParsedResult.storeName)}</span></div>` : '',
+          currentParsedResult.totalAmount ? `<div class="ocr-parsed-item ocr-meta"><span>合計</span><span>¥${currentParsedResult.totalAmount.toLocaleString()}</span></div>` : '',
         ].join('');
-        ocrParsed.innerHTML = metaRows + parsed.items
+        ocrParsed.innerHTML = metaRows + currentParsedResult.items
           .map(it =>
             `<div class="ocr-parsed-item">`
             + `<span>${esc(it.name)}</span>`
@@ -958,7 +959,9 @@
         btnGoMain.textContent   = '割り勘リストに追加して進む →';
         btnGoMain.style.display = 'block';
         btnGoMain.onclick = () => {
-          parsed.items.forEach(it => {
+          console.log('[btnGoMain] 保存データ:', currentParsedResult);
+          localStorage.setItem('currentParsedResult', JSON.stringify(currentParsedResult));
+          currentParsedResult.items.forEach(it => {
             const checked = {};
             MEMBERS.forEach(m => (checked[m.key] = false));
             items.push({ id: Date.now() + (Math.random() * 1000 | 0), name: it.name, price: it.price, checked });
