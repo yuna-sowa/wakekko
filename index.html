@@ -961,6 +961,7 @@
         btnGoMain.onclick = () => {
           console.log('[btnGoMain] 保存データ:', currentParsedResult);
           localStorage.setItem('currentParsedResult', JSON.stringify(currentParsedResult));
+          items.length = 0; // 既存データをクリアしてOCR結果のみ反映
           currentParsedResult.items.forEach(it => {
             const checked = {};
             MEMBERS.forEach(m => (checked[m.key] = false));
