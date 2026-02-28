@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 278" width="560" height="278">
+
+  <!-- 背景 -->
+  <rect width="560" height="278" rx="14" fill="#FFF5F0"/>
+
+  <!-- タイトル -->
+  <text x="280" y="24" text-anchor="middle" font-family="sans-serif" font-size="14" font-weight="bold" fill="#FF7E5F">わけっこ アイコン案 10選</text>
+  <line x1="24" y1="34" x2="536" y2="34" stroke="#FFD0C0" stroke-width="1"/>
+
+  <!-- ======== ROW 1 ======== -->
+
+  <!-- 1. コイン÷ (cx=56, cy=78) -->
+  <circle cx="56" cy="78" r="30" stroke="#FF7E5F" stroke-width="4" fill="none"/>
+  <text x="56" y="78" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="26" fill="#FF7E5F" font-weight="bold">÷</text>
+  <text x="56" y="124" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">コイン÷</text>
+
+  <!-- 2. レシート (cx=168, cy=78) -->
+  <path d="M148,48 L188,48 L188,95 Q184,102 180,95 Q176,88 172,95 Q168,102 164,95 Q160,88 156,95 Q152,102 148,95 Z" fill="#FF7E5F"/>
+  <line x1="156" y1="62" x2="180" y2="62" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="156" y1="73" x2="180" y2="73" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="156" y1="84" x2="170" y2="84" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="168" y="124" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">レシート</text>
+
+  <!-- 3. 紙幣を分割 (cx=280, cy=78) -->
+  <rect x="248" y="58" width="64" height="38" rx="5" stroke="#FF7E5F" stroke-width="3.5" fill="#FFF5F0"/>
+  <line x1="269" y1="60" x2="269" y2="94" stroke="#FF7E5F" stroke-width="2.5"/>
+  <line x1="291" y1="60" x2="291" y2="94" stroke="#FF7E5F" stroke-width="2.5"/>
+  <text x="280" y="124" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">紙幣を分割</text>
+
+  <!-- 4. 円グラフ (cx=392, cy=78) -->
+  <path d="M392,78 L422,78 A30,30,0,0,1,377,104 Z" fill="#FF7E5F"/>
+  <path d="M392,78 L377,104 A30,30,0,0,1,377,52 Z" fill="#6BB5FF"/>
+  <path d="M392,78 L377,52 A30,30,0,0,1,422,78 Z" fill="#FFD166"/>
+  <circle cx="392" cy="78" r="30" stroke="white" stroke-width="2.5" fill="none"/>
+  <text x="392" y="124" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">円グラフ</text>
+
+  <!-- 5. ふたつの手 (cx=504, cy=78) -->
+  <!-- 左の手（親指が左に出る） -->
+  <rect x="481" y="61" width="14" height="32" rx="5" fill="#FF7E5F"/>
+  <ellipse cx="477" cy="76" rx="5" ry="8" fill="#FF7E5F"/>
+  <!-- 右の手（親指が右に出る） -->
+  <rect x="513" y="61" width="14" height="32" rx="5" fill="#FF7E5F"/>
+  <ellipse cx="531" cy="76" rx="5" ry="8" fill="#FF7E5F"/>
+  <text x="504" y="124" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">ふたつの手</text>
+
+  <!-- 区切り線 -->
+  <line x1="24" y1="140" x2="536" y2="140" stroke="#FFD0C0" stroke-width="1" stroke-dasharray="5,4"/>
+
+  <!-- ======== ROW 2 ======== -->
+
+  <!-- 6. 人型+÷ (cx=56, cy=196) -->
+  <!-- 左の人 -->
+  <circle cx="28" cy="170" r="8" fill="#FF7E5F"/>
+  <line x1="28" y1="178" x2="28" y2="198" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="17" y1="186" x2="39" y2="186" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="28" y1="198" x2="20" y2="210" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="28" y1="198" x2="36" y2="210" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <!-- ÷ -->
+  <text x="56" y="192" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="18" fill="#FF7E5F" font-weight="bold">÷</text>
+  <!-- 右の人 -->
+  <circle cx="84" cy="170" r="8" fill="#FF7E5F"/>
+  <line x1="84" y1="178" x2="84" y2="198" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="73" y1="186" x2="95" y2="186" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="84" y1="198" x2="76" y2="210" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <line x1="84" y1="198" x2="92" y2="210" stroke="#FF7E5F" stroke-width="3" stroke-linecap="round"/>
+  <text x="56" y="252" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">人型+÷</text>
+
+  <!-- 7. ハートコイン (cx=168, cy=196) -->
+  <path d="M168,184 C168,176 160,171 153,176 C146,181 146,191 153,196 C159,200 168,209 168,214 C168,209 177,200 183,196 C190,191 190,181 183,176 C176,171 168,176 168,184 Z" fill="#FF7E5F"/>
+  <text x="168" y="196" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" fill="white" font-weight="bold">¥</text>
+  <text x="168" y="252" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">ハートコイン</text>
+
+  <!-- 8. わ（ひらがな）(cx=280, cy=196) -->
+  <rect x="256" y="164" width="48" height="48" rx="10" fill="#FF7E5F"/>
+  <text x="280" y="188" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="30" fill="white">わ</text>
+  <text x="280" y="252" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">わ（ひらがな）</text>
+
+  <!-- 9. ÷のみ (cx=392, cy=196) -->
+  <text x="392" y="196" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="54" fill="#FF7E5F" font-weight="bold">÷</text>
+  <text x="392" y="252" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">÷のみ</text>
+
+  <!-- 10. ナイフで切るコイン (cx=504, cy=196) -->
+  <circle cx="504" cy="194" r="30" stroke="#FF7E5F" stroke-width="3" fill="#FFF5F0"/>
+  <circle cx="504" cy="194" r="22" stroke="#FF7E5F" stroke-width="1.5" fill="none"/>
+  <!-- 刃の線（コインを斜めに横断） -->
+  <line x1="481" y1="171" x2="527" y2="217" stroke="#555" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- ナイフの柄 -->
+  <rect x="471" y="160" width="15" height="20" rx="4" fill="#555"/>
+  <text x="504" y="252" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#999">ナイフで切るコイン</text>
+
+</svg>

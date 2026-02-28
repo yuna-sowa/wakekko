@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 178" width="480" height="178">
+
+  <!-- 背景 -->
+  <rect width="480" height="178" rx="14" fill="#FFF5F0"/>
+  <text x="240" y="22" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="bold" fill="#FF7E5F">レシート分割 アイコン案</text>
+  <line x1="20" y1="32" x2="460" y2="32" stroke="#FFD0C0" stroke-width="1"/>
+  <line x1="160" y1="36" x2="160" y2="158" stroke="#FFD0C0" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="320" y1="36" x2="320" y2="158" stroke="#FFD0C0" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- 番号ラベル -->
+  <text x="24" y="47" font-family="sans-serif" font-size="10" fill="#FF7E5F" font-weight="bold">1</text>
+  <text x="184" y="47" font-family="sans-serif" font-size="10" fill="#FF7E5F" font-weight="bold">2</text>
+  <text x="344" y="47" font-family="sans-serif" font-size="10" fill="#FF7E5F" font-weight="bold">3</text>
+
+  <!-- ===== ICON 1: 手で引き裂く (center 80) ===== -->
+
+  <!-- 左のレシート片（ギザギザ右端） -->
+  <path d="M38,44 L72,44 L68,51 L74,58 L68,65 L74,72 L68,79 L74,86 L68,93 L74,100 L68,107 L72,114 L38,114 Z"
+        fill="#FF7E5F"/>
+  <line x1="44" y1="62" x2="65" y2="62" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="44" y1="73" x2="65" y2="73" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="44" y1="84" x2="57" y2="84" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="44" y1="95" x2="65" y2="95" stroke="white" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- 右のレシート片（ギザギザ左端） -->
+  <path d="M88,44 L84,51 L90,58 L84,65 L90,72 L84,79 L90,86 L84,93 L90,100 L84,107 L88,114 L122,114 L122,44 Z"
+        fill="#FF9878"/>
+  <line x1="95" y1="62" x2="116" y2="62" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="95" y1="73" x2="116" y2="73" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="95" y1="84" x2="108" y2="84" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="95" y1="95" x2="116" y2="95" stroke="white" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- 左右に引っ張る矢印 -->
+  <polygon points="26,79 38,71 38,87" fill="#FF7E5F"/>
+  <polygon points="134,79 122,71 122,87" fill="#FF9878"/>
+
+  <text x="80" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">手で引き裂く</text>
+
+  <!-- ===== ICON 2: 3等分レシート (center 240) ===== -->
+
+  <!-- レシート本体（ウェーブ底） -->
+  <path d="M200,44 L280,44 L280,112 Q270,119 260,112 Q250,105 240,112 Q230,119 220,112 Q210,105 200,112 Z"
+        fill="#FF7E5F"/>
+
+  <!-- セクション区切り線（白） -->
+  <line x1="227" y1="46" x2="227" y2="108" stroke="white" stroke-width="2.5"/>
+  <line x1="253" y1="46" x2="253" y2="108" stroke="white" stroke-width="2.5"/>
+
+  <!-- 各セクションのコンテンツ線 -->
+  <line x1="206" y1="62" x2="222" y2="62" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="206" y1="74" x2="222" y2="74" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="206" y1="86" x2="222" y2="86" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="232" y1="62" x2="248" y2="62" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="232" y1="74" x2="248" y2="74" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="232" y1="86" x2="248" y2="86" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="258" y1="62" x2="274" y2="62" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="258" y1="74" x2="274" y2="74" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+  <line x1="258" y1="86" x2="274" y2="86" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- 3人分を示すアイコン（人型の丸） -->
+  <circle cx="213" cy="128" r="6" fill="#FF7E5F"/>
+  <circle cx="240" cy="128" r="6" fill="#FF7E5F"/>
+  <circle cx="267" cy="128" r="6" fill="#FF7E5F"/>
+
+  <text x="240" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">3等分レシート</text>
+
+  <!-- ===== ICON 3: 3枚ファン（3色） (center 400) ===== -->
+
+  <!-- 左レシート（青、-18°傾き） -->
+  <g transform="rotate(-18, 400, 107)">
+    <path d="M386,52 L414,52 L414,104 Q409,111 404,104 Q400,97 396,104 Q391,111 386,104 Z"
+          fill="#6BB5FF"/>
+    <line x1="391" y1="68" x2="409" y2="68" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="391" y1="79" x2="409" y2="79" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="391" y1="90" x2="402" y2="90" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+
+  <!-- 右レシート（黄、+18°傾き） -->
+  <g transform="rotate(18, 400, 107)">
+    <path d="M386,52 L414,52 L414,104 Q409,111 404,104 Q400,97 396,104 Q391,111 386,104 Z"
+          fill="#FFD166"/>
+    <line x1="391" y1="68" x2="409" y2="68" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="391" y1="79" x2="409" y2="79" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="391" y1="90" x2="402" y2="90" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+
+  <!-- 中央レシート（コーラル、最前面） -->
+  <path d="M386,52 L414,52 L414,104 Q409,111 404,104 Q400,97 396,104 Q391,111 386,104 Z"
+        fill="#FF7E5F"/>
+  <line x1="391" y1="68" x2="409" y2="68" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="391" y1="79" x2="409" y2="79" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="391" y1="90" x2="402" y2="90" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+
+  <text x="400" y="153" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#999">3枚ファン（3色）</text>
+
+</svg>
