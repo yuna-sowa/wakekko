@@ -1032,7 +1032,7 @@
     }
 
     // ── 商品抽出 ──────────────────────────────────────────────────
-    const SKIP = /小計|合計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ポイント|利用|お買上点数|クレジット|現金|割引|値引|クーポン|支払/;
+    const SKIP = /小計|合計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ポイント|利用|お買上点数|クレジット|現金|割引|値引|クーポン|支払|登録番号/;
     const TEL  = /TEL|tel|Tel|0120|\d{2,4}-\d{2,4}-\d{4}/;
     const seen  = new Set();
     const items = [];
@@ -1046,29 +1046,36 @@
       return (v >= 10 && v < 100_000) ? v : null;
     };
 
+    // 日本語文字（ひらがな・カタカナ・漢字）を含むか
+    const hasJapanese = l => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(l);
+
     // 日本語・英字を含むか
-    const hasText = l => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(l) || /[A-Za-z]/.test(l);
+    const hasText = l => hasJapanese(l) || /[A-Za-z]/.test(l);
 
     // 処理対象外と判定する行
     const isExcluded = line =>
       SKIP.test(line) ||
       TEL.test(line) ||
-      /^\d+$/.test(line) ||             // 数字のみ
-      /\d{10,}/.test(line) ||           // 登録番号・長い連続数字（10桁以上）
-      /\d{4}\/\d{2}\/\d{2}/.test(line) || // 日付（2024/01/23）
-      /\d{2}:\d{2}/.test(line);         // 時刻（12:34）
+      /^\d+$/.test(line) ||                          // 数字のみ
+      /\d{10,}/.test(line) ||                        // 登録番号・長い連続数字（10桁以上）
+      /\d{4}\/\d{2}\/\d{2}/.test(line) ||            // 日付（2024/01/23）
+      /\d{2}:\d{2}/.test(line) ||                    // 時刻（12:34）
+      /^[Xx×Ｘ＊*\s]+$/.test(line) ||               // X や * のみの行（マスク文字列）
+      /(\d{4}[\s\-]){3}\d{4}/.test(line) ||          // クレジットカード番号（4-4-4-4）
+      /[Xx]{4}[\s\-][Xx]{4}/.test(line);             // マスク済みカード番号（XXXX XXXX...）
 
     // 商品名のノイズ除去
     const cleanName = raw => {
       let name = raw;
-      name = name.replace(/^\d{8,13}\s*/, '');                        // ① JANコード
-      name = name.replace(/^\d{3,7}[※\s]\s*/, '');                   // ② 短い数字コード
-      name = name.replace(/^\d+\s+/, '');                             // ③ 先頭の孤立数字
-      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, ''); // ④ 記号
+      name = name.replace(/^[＊*]\s*/, '');                            // ① 先頭の * を除去（軽減税率マークなど）
+      name = name.replace(/^\d{8,13}\s*/, '');                        // ② JANコード
+      name = name.replace(/^\d{3,7}[※\s]\s*/, '');                   // ③ 短い数字コード
+      name = name.replace(/^\d+\s+/, '');                             // ④ 先頭の孤立数字
+      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, ''); // ⑤ 記号
       name = name
-        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')            // ⑤ 先頭ノイズ
-        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');      // ⑤ 末尾ノイズ
-      return name.replace(/\s{2,}/g, ' ').trim();                     // ⑥ 連続スペース
+        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')            // ⑥ 先頭ノイズ
+        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');      // ⑥ 末尾ノイズ
+      return name.replace(/\s{2,}/g, ' ').trim();                     // ⑦ 連続スペース
     };
 
     const pushItem = (name, price) => {
@@ -1113,8 +1120,9 @@
         continue;
       }
 
-      // ── ケース4: 商品名候補行（文字あり + 行末に価格なし）────────
-      if (lineHasText) {
+      // ── ケース4: 商品名候補行（日本語を含む + 行末に価格なし）───
+      // 日本語文字を含む行のみ商品名候補とする（英数字のみの行は除外）
+      if (lineHasText && hasJapanese(line)) {
         pendingItemName = line;
         continue;
       }
