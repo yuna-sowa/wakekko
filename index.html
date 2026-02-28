@@ -991,47 +991,129 @@
    * @param {string} text - Vision API の fullTextAnnotation.text
    * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
    *
-   * 商品抽出は「価格行を起点にする方式」:
-   *   価格行を見つけたら、その行自体に商品名があれば使い（1行完結）、
-   *   なければ1つ前の行を商品名とする（2行構造）。
+   * 処理フロー:
+   *   1. 前処理: 「合計/TOTAL/Total」行以降を切り捨て（支払情報を除外）
+   *              ※「小計/SUBTOTAL」では切らない
+   *   2. 店名: 上から5行（非空行）で条件を満たす最初の行（文字種制限なし）
+   *   3. 合計: 「合計」行の末尾金額（¥・カンマを除去して数値化）
+   *   4. 商品: 名前候補行の同一行または次の2行以内に「価格のみ行」があれば登録
    */
   function parseReceiptItems(text) {
-    // 全角数字・全角スペースを半角に統一し、空行も含めてインデックスを保持する
-    const lines = text.split('\n').map(raw =>
+    // 全角数字・全角スペースを半角に統一（空行も含めインデックスを保持）
+    const allLines = text.split('\n').map(raw =>
       raw
         .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
         .replace(/　/g, ' ')
         .trim()
     );
-    const nonEmpty = lines.filter(l => l.length > 0);
 
     // ── 共通パターン ──────────────────────────────────────────────
-    const DATE_PAT  = /\d{4}[\/\-]\d{2}[\/\-]\d{2}/;
-    const TIME_PAT  = /\d{2}:\d{2}/;
-    const TEL_PAT   = /TEL|tel|0120|\d{2,4}-\d{2,4}-\d{4}/;
-    // 価格行・商品名の両方で除外するキーワード
-    const SKIP_PAT  = /合計|小計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ポイント|利用|お買上点数|クレジット|現金|割引|値引|クーポン|支払|登録番号|TOTAL|SUBTOTAL|TAX|REGISTER|INVOICE/i;
+    const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}/;
+    const TIME_PAT = /\d{2}:\d{2}/;
+    const TEL_PAT  = /TEL|tel|0120|\d{2,4}-\d{2,4}-\d{4}/;
+
+    // 「合計/TOTAL/Total」行か（「小計/SUBTOTAL」はfalse）
+    function isTotalLine(l) {
+      return /合計|TOTAL|Total/.test(l) && !/小計|SUBTOTAL/i.test(l);
+    }
+
+    // ── 前処理: 合計行以降を削除（支払情報を除外） ────────────────
+    let cutIdx = allLines.length;
+    for (let i = 0; i < allLines.length; i++) {
+      if (allLines[i] && isTotalLine(allLines[i])) {
+        cutIdx = i + 1; // 合計行自体は含める
+        break;
+      }
+    }
+    const lines    = allLines.slice(0, cutIdx);
+    const nonEmpty = lines.filter(l => l.length > 0);
+
+    // ── ヘルパー関数 ──────────────────────────────────────────────
+
+    // 行末の正の有効価格（10〜99,999円）を返す。マイナス・TEL・日付はnull
+    function extractPrice(line) {
+      if (!line) return null;
+      if (/[△\-－]\s*[\d,]+\s*円?\s*$/.test(line)) return null; // マイナス金額
+      if (TEL_PAT.test(line))  return null;
+      if (DATE_PAT.test(line)) return null;
+      const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/);
+      if (!m) return null;
+      const v = parseInt(m[1].replace(/,/g, ''), 10);
+      return (v >= 10 && v < 100_000) ? v : null;
+    }
+
+    // 商品名候補として除外すべき行か
+    function isSkipLine(line) {
+      if (!line)                                    return true;
+      if (/^[@＠]/.test(line))                      return true; // @で始まる（単価情報）
+      if (/ポイント|値引き?|消費税/.test(line))      return true; // 除外キーワード
+      if (/[△\-－]\s*[\d,]+\s*円?\s*$/.test(line)) return true; // マイナス金額
+      if (isTotalLine(line))                        return true; // 合計行
+      if (/小計|SUBTOTAL/i.test(line))              return true; // 小計行
+      if (TEL_PAT.test(line))                       return true;
+      if (DATE_PAT.test(line))                      return true;
+      if (TIME_PAT.test(line))                      return true;
+      return false;
+    }
+
+    // 「価格のみ行」か（商品名を含まない、価格だけの行）
+    // @行・数字のみ・数量＋価格の形式が該当する
+    function isPriceOnlyLine(line) {
+      if (!line) return false;
+      if (/^[@＠]/.test(line)) return true; // @行は常に価格のみ行
+      const pm = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/);
+      if (!pm) return false;
+      const prefix = line.slice(0, line.length - pm[0].length).trim();
+      // 価格前のテキストが空 or 数字・記号のみ（「1点」「2個」など）
+      return prefix.length === 0 || /^[@＠\d\s点個枚本袋,]+$/.test(prefix);
+    }
+
+    // 商品名のクリーニング
+    function cleanName(raw) {
+      let name = raw;
+      name = name.replace(/^[＊*]\s*/, '');         // ① 先頭の * 除去（軽減税率マークなど）
+      name = name.replace(/^\d{8,13}\s*/, '');      // ② JANコード除去
+      name = name.replace(/^\d{3,7}[\s※]\s*/, ''); // ③ 短い数字コード除去
+      name = name.replace(/^\d+\s+/, '');           // ④ 先頭の孤立数字除去
+      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽~～｜|]+/g, ''); // ⑤ 記号除去
+      name = name.replace(/\s{2,}/g, ' ').trim();   // ⑥ 連続スペース整理
+      return name;
+    }
+
+    // 商品名として無効か
+    function isInvalidName(name) {
+      if (!name || name.length === 0)              return true;
+      if (/ポイント|値引き?|消費税|合計|小計/.test(name)) return true;
+      if (DATE_PAT.test(name))                     return true;
+      if (TIME_PAT.test(name))                     return true;
+      if (/(\d{4}[\s\-]){3}\d{4}/.test(name))     return true; // クレジットカード番号
+      if (/[A-Za-z0-9]{12,}/.test(name))           return true; // 12桁以上の連続英数字
+      const xCount = (name.match(/[Xx×Ｘ＊*]/g) || []).length;
+      if (name.length > 0 && xCount / name.length >= 0.7) return true; // 70%以上がX/*
+      return false;
+    }
 
     // ── 店名抽出 ──────────────────────────────────────────────────
-    // 上から5行（非空行）の中で、除外条件に引っかからない最初の行
+    // 上から5行（非空行）で条件を満たす最初の行（文字種制限なし）
     let storeName = '';
     for (let i = 0; i < Math.min(5, nonEmpty.length); i++) {
       const l = nonEmpty[i];
-      if (SKIP_PAT.test(l))          continue; // 合計・税・TOTALなど
-      if (TEL_PAT.test(l))           continue; // 電話番号
-      if (DATE_PAT.test(l))          continue; // 日付
-      if (TIME_PAT.test(l))          continue; // 時刻
-      if (/^\d+$/.test(l))           continue; // 数字のみ
-      if (extractPriceFromLine(l) !== null) continue; // 金額を含む行
+      if (isTotalLine(l))           continue;
+      if (/小計|SUBTOTAL/i.test(l)) continue;
+      if (TEL_PAT.test(l))          continue;
+      if (DATE_PAT.test(l))         continue;
+      if (TIME_PAT.test(l))         continue;
+      if (/^\d+$/.test(l))          continue; // 数字のみ
+      if (extractPrice(l) !== null) continue; // 金額を含む行
       storeName = l;
       break;
     }
 
     // ── 合計金額抽出 ──────────────────────────────────────────────
-    // 「合計」を含む行の末尾金額を収集し最大値を採用
+    // 「合計」行（小計除く）の末尾金額の最大値を採用
     let totalAmount = 0;
     for (const l of nonEmpty) {
-      if (!/合計/.test(l)) continue;
+      if (!isTotalLine(l)) continue;
       const m = l.match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
       if (m) {
         const v = parseInt(m[1].replace(/,/g, ''), 10);
@@ -1039,55 +1121,7 @@
       }
     }
 
-    // ── ヘルパー関数 ──────────────────────────────────────────────
-
-    // 行末の有効価格（10〜99,999円）を返す。なければ null
-    function extractPriceFromLine(line) {
-      const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/);
-      if (!m) return null;
-      const v = parseInt(m[1].replace(/,/g, ''), 10);
-      return (v >= 10 && v < 100_000) ? v : null;
-    }
-
-    // その行が「価格行」かどうか
-    // 日付・時刻・SKIP キーワードを含む行は価格行とみなさない
-    function isPriceLine(line) {
-      if (!line)              return false;
-      if (DATE_PAT.test(line))  return false; // 日付行
-      if (TIME_PAT.test(line))  return false; // 時刻行
-      if (SKIP_PAT.test(line))  return false; // 合計・税など
-      if (/@\d+/.test(line))    return true;  // @数字を含む行
-      return extractPriceFromLine(line) !== null;
-    }
-
-    // 商品名として無効なパターンかどうか
-    function isInvalidName(name) {
-      if (!name || name.length === 0)            return true;
-      if (SKIP_PAT.test(name))                   return true;
-      if (TEL_PAT.test(name))                    return true;
-      if (DATE_PAT.test(name))                   return true;
-      if (TIME_PAT.test(name))                   return true;
-      if (/(\d{4}[\s\-]){3}\d{4}/.test(name))   return true; // クレジットカード番号（4-4-4-4）
-      if (/[A-Za-z0-9]{12,}/.test(name))         return true; // 12桁以上の連続英数字
-      // 文字の70%以上が X や * → マスク文字列
-      const xCount = (name.match(/[Xx×Ｘ＊*]/g) || []).length;
-      if (name.length > 0 && xCount / name.length >= 0.7) return true;
-      return false;
-    }
-
-    // 商品名のクリーニング
-    function cleanName(raw) {
-      let name = raw;
-      name = name.replace(/^[＊*]\s*/, '');    // ① 先頭の * 除去（軽減税率マークなど）
-      name = name.replace(/^\d{8,13}\s*/, ''); // ② JANコード除去
-      name = name.replace(/^\d{3,7}[\s※]\s*/, ''); // ③ 短い数字コード除去
-      name = name.replace(/^\d+\s+/, '');      // ④ 先頭の孤立数字除去
-      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽~～｜|]+/g, ''); // ⑤ 記号除去
-      name = name.replace(/\s{2,}/g, ' ').trim(); // ⑥ 連続スペース整理
-      return name;
-    }
-
-    // ── 商品抽出（価格行を起点にする） ───────────────────────────
+    // ── 商品抽出 ──────────────────────────────────────────────────
     const seen  = new Set();
     const items = [];
 
@@ -1102,36 +1136,39 @@
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!isPriceLine(line)) continue;
+      if (!line)            continue;
+      if (isSkipLine(line)) continue;
 
-      const price = extractPriceFromLine(line);
-      if (price === null) continue;
+      // 行末の価格を確認
+      const inlinePrice = extractPrice(line);
+      const priceMatch  = inlinePrice !== null
+        ? line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/)
+        : null;
+      const namePart = (priceMatch
+        ? line.slice(0, line.length - priceMatch[0].length)
+        : line).trim();
 
-      const isAtLine = /@\d+/.test(line);
+      if (inlinePrice !== null && namePart.length > 0) {
+        // ── パターン①: 1行完結（同一行に商品名と価格）──────────────
+        pushItem(namePart, inlinePrice);
+        continue;
+      }
 
-      // 価格部分を除いたテキスト（@単価・数量表記を取り除く）
-      const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/);
-      let namePart = priceMatch
-        ? line.slice(0, line.length - priceMatch[0].length).trim()
-        : '';
-      namePart = namePart
-        .replace(/@[\d,]+\s*/g, '') // @単価除去
-        .replace(/\d+点\s*/g, '')   // 数量（1点）除去
-        .trim();
-
-      if (!isAtLine && namePart.length > 0) {
-        // ── パターン①: 1行完結（価格行自体に商品名あり） ──────────
-        pushItem(namePart, price);
-      } else {
-        // ── パターン②: 2行構造（1つ前の非空行を商品名とする） ──────
-        let prevLine = '';
-        for (let j = i - 1; j >= 0; j--) {
-          if (lines[j] && lines[j].trim()) { prevLine = lines[j].trim(); break; }
+      // ── パターン②: 名前候補行 ────────────────────────────────────
+      // 次の2行以内に「価格のみ行」があれば商品として登録する
+      // 1行完結型の行（名前＋価格）の価格は借りない
+      if (namePart.length > 0) {
+        for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+          const nextLine = lines[j];
+          if (!nextLine)                  continue; // 空行はスキップ
+          if (!isPriceOnlyLine(nextLine)) continue; // 名前+価格行の価格は借りない
+          const nextPrice = extractPrice(nextLine);
+          if (nextPrice !== null) {
+            pushItem(namePart, nextPrice);
+            break;
+          }
         }
-        // 前の行が価格行なら商品名として使わない（孤立した価格行）
-        if (prevLine && !isPriceLine(prevLine)) {
-          pushItem(prevLine, price);
-        }
+        // 2行以内に価格のみ行がなければ商品として登録しない
       }
     }
 
