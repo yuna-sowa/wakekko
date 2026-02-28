@@ -987,12 +987,9 @@
    * @param {string} text - Vision API の fullTextAnnotation.text
    * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
    *
-   * 処理フロー:
-   *   1. 全角数字/スペースを半角に統一
-   *   2. 店名: TELより上にある最初の文字ブロック（住所・数字過多行は除外）
-   *   3. 合計: 「合計」を含む行の末尾金額（最大値 = 最終支払金額）
-   *   4. 商品: 電話番号・スキップ行・数字のみ行・長い連続数字を除外し、
-   *            行末の価格を抽出して商品名をクリーニング
+   * 商品抽出は1行完結型と2行構造型の両方に対応する:
+   *   パターン①（1行完結）: 「コアラパン 190」→ 行末価格 + 文字あり + @なし
+   *   パターン②（2行構造）: 「キャラメルポップコーン」→「@150 1点 150」→ pendingItemName で連結
    */
   function parseReceiptItems(text) {
     const lines = text.split('\n').map(raw =>
@@ -1031,42 +1028,95 @@
     }
 
     // ── 商品抽出 ──────────────────────────────────────────────────
-    const SKIP = /小計|合計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ご利用|ポイント|割引|値引|クーポン|支払/;
+    const SKIP = /小計|合計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ポイント|利用|お買上点数|クレジット|現金|割引|値引|クーポン|支払/;
     const TEL  = /TEL|tel|Tel|0120|\d{2,4}-\d{2,4}-\d{4}/;
     const seen  = new Set();
     const items = [];
+    let pendingItemName = null; // 2行構造型の商品名を一時保持
+
+    // 行末の有効価格（10〜99,999円）を返す。なければ null
+    const extractPrice = line => {
+      const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,4})\s*円?\s*$/);
+      if (!m) return null;
+      const v = parseInt(m[1].replace(',', ''), 10);
+      return (v >= 10 && v < 100_000) ? v : null;
+    };
+
+    // 日本語・英字を含むか
+    const hasText = l => /[\u3040-\u30FF\u4E00-\u9FFF]/.test(l) || /[A-Za-z]/.test(l);
+
+    // 処理対象外と判定する行
+    const isExcluded = line =>
+      SKIP.test(line) ||
+      TEL.test(line) ||
+      /^\d+$/.test(line) ||             // 数字のみ
+      /\d{10,}/.test(line) ||           // 登録番号・長い連続数字（10桁以上）
+      /\d{4}\/\d{2}\/\d{2}/.test(line) || // 日付（2024/01/23）
+      /\d{2}:\d{2}/.test(line);         // 時刻（12:34）
+
+    // 商品名のノイズ除去
+    const cleanName = raw => {
+      let name = raw;
+      name = name.replace(/^\d{8,13}\s*/, '');                        // ① JANコード
+      name = name.replace(/^\d{3,7}[※\s]\s*/, '');                   // ② 短い数字コード
+      name = name.replace(/^\d+\s+/, '');                             // ③ 先頭の孤立数字
+      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, ''); // ④ 記号
+      name = name
+        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')            // ⑤ 先頭ノイズ
+        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');      // ⑤ 末尾ノイズ
+      return name.replace(/\s{2,}/g, ' ').trim();                     // ⑥ 連続スペース
+    };
+
+    const pushItem = (name, price) => {
+      const cleaned = cleanName(name);
+      if (!cleaned) return;
+      const key = `${cleaned}:${price}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      items.push({ name: cleaned, price });
+    };
 
     for (const line of lines) {
-      if (SKIP.test(line)) continue;
-      if (TEL.test(line)) continue;              // 電話番号行除外
-      if (/^\d+$/.test(line)) continue;          // 数字のみ除外
-      if (/\d{10,}/.test(line)) continue;        // 登録番号・長い連続数字除外
-      if (/@\d+\s*\d+点/.test(line)) continue;   // 単価情報（@150 1点）除外
+      // 除外行はペンディングもリセット
+      if (isExcluded(line)) { pendingItemName = null; continue; }
 
-      // 行末の価格を抽出（10〜99,999円、カンマ区切り対応）
-      const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,4})\s*円?\s*$/);
-      if (!priceMatch) continue;
+      const price       = extractPrice(line);
+      const lineHasText = hasText(line);
+      const isAtLine    = /@\d+/.test(line); // 単価情報（@150 など）を含む行
 
-      const price = parseInt(priceMatch[1].replace(',', ''), 10);
-      if (price < 10 || price >= 100_000) continue;
+      // ── ケース1: @数字を含む → 2行構造の価格行 ──────────────────
+      if (isAtLine) {
+        if (pendingItemName !== null && price !== null) {
+          pushItem(pendingItemName, price);
+        }
+        pendingItemName = null;
+        continue;
+      }
 
-      // 商品名クリーニング
-      let name = line.slice(0, line.length - priceMatch[0].length).trim();
-      name = name.replace(/^\d{8,13}\s*/, '');                        // ① JANコード除去
-      name = name.replace(/^\d{3,7}[※\s]\s*/, '');                   // ② 短い数字コード除去
-      name = name.replace(/^\d+\s+/, '');                             // ③ 先頭の孤立数字除去
-      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, ''); // ④ 記号除去
-      name = name
-        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')            // ⑤ 先頭ノイズ除去
-        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');      // ⑤ 末尾ノイズ除去
-      name = name.replace(/\s{2,}/g, ' ').trim();                     // ⑥ 連続スペース整理
+      // ── ケース2: 1行完結型（行末に価格あり + 文字あり + @なし）──
+      if (price !== null && lineHasText) {
+        const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,4})\s*円?\s*$/);
+        const namepart   = line.slice(0, line.length - priceMatch[0].length).trim();
+        pendingItemName  = null;
+        if (namepart) pushItem(namepart, price);
+        continue;
+      }
 
-      if (!name) continue;
+      // ── ケース3: 価格のみ行（行末に価格あり + 文字なし）→ 2行構造の価格行 ──
+      if (price !== null && !lineHasText) {
+        if (pendingItemName !== null) pushItem(pendingItemName, price);
+        pendingItemName = null;
+        continue;
+      }
 
-      const key = `${name}:${price}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push({ name, price });
+      // ── ケース4: 商品名候補行（文字あり + 行末に価格なし）────────
+      if (lineHasText) {
+        pendingItemName = line;
+        continue;
+      }
+
+      // ── ケース5: その他（数字のみなど）→ リセット ────────────────
+      pendingItemName = null;
     }
 
     return { storeName, totalAmount, items };
