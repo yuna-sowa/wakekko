@@ -939,11 +939,15 @@
       // 生テキストをそのまま表示（デバッグ・確認用）
       ocrText.textContent = text.trim() || '（テキストを検出できませんでした）';
 
-      // 5. 商品・金額をパースして一覧化
+      // 5. 商品・金額・店名・合計をパースして一覧化
       const parsed = parseReceiptItems(text);
 
-      if (parsed.length > 0) {
-        ocrParsed.innerHTML = parsed
+      if (parsed.items.length > 0) {
+        const metaRows = [
+          parsed.storeName   ? `<div class="ocr-parsed-item ocr-meta"><span>店名</span><span>${esc(parsed.storeName)}</span></div>` : '',
+          parsed.totalAmount ? `<div class="ocr-parsed-item ocr-meta"><span>合計</span><span>¥${parsed.totalAmount.toLocaleString()}</span></div>` : '',
+        ].join('');
+        ocrParsed.innerHTML = metaRows + parsed.items
           .map(it =>
             `<div class="ocr-parsed-item">`
             + `<span>${esc(it.name)}</span>`
@@ -954,7 +958,7 @@
         btnGoMain.textContent   = '割り勘リストに追加して進む →';
         btnGoMain.style.display = 'block';
         btnGoMain.onclick = () => {
-          parsed.forEach(it => {
+          parsed.items.forEach(it => {
             const checked = {};
             MEMBERS.forEach(m => (checked[m.key] = false));
             items.push({ id: Date.now() + (Math.random() * 1000 | 0), name: it.name, price: it.price, checked });
@@ -978,76 +982,94 @@
   }
 
   /**
-   * OCR テキストから商品名と価格を抽出・整形する。
+   * OCR テキストから店名・合計・商品一覧を抽出して返す。
+   *
+   * @param {string} text - Vision API の fullTextAnnotation.text
+   * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
    *
    * 処理フロー:
    *   1. 全角数字/スペースを半角に統一
-   *   2. 合計・税額など商品以外の行をスキップ
-   *   3. 行末の 2〜4 桁（またはカンマ区切り）の価格を抽出
-   *   4. 商品名のノイズ除去:
-   *      ① 先頭の JAN コード（8〜13 桁）
-   *      ② 「0000※」「00001 」のような短い数字コード
-   *      ③ 先頭に残った孤立した数字列
-   *      ④ 不要な記号（※ \ × ☆ ● など）
-   *      ⑤ 先頭・末尾の非文字ノイズ
-   *      ⑥ 連続スペースを整理
+   *   2. 店名: TELより上にある最初の文字ブロック（住所・数字過多行は除外）
+   *   3. 合計: 「合計」を含む行の末尾金額（最大値 = 最終支払金額）
+   *   4. 商品: 電話番号・スキップ行・数字のみ行・長い連続数字を除外し、
+   *            行末の価格を抽出して商品名をクリーニング
    */
   function parseReceiptItems(text) {
-    const seen    = new Set();
-    const results = [];
-
-    // 合計・税額・釣銭など商品行でない行を除外するパターン
-    const SKIP = /小計|合計|内税|外税|消費税|税額|お釣|つり|お預|ご利用|ポイント|割引|値引|クーポン|支払/;
-
-    for (const raw of text.split('\n')) {
-      // 全角数字・全角スペースを半角に統一
-      const line = raw
+    const lines = text.split('\n').map(raw =>
+      raw
         .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
         .replace(/　/g, ' ')
-        .trim();
+        .trim()
+    ).filter(Boolean);
 
-      if (!line) continue;
+    // ── 店名抽出 ──────────────────────────────────────────────────
+    // TELより上の行から、住所・数字過多を除いた最初の文字ブロック
+    let storeName = '';
+    const telIdx = lines.findIndex(l => /TEL|tel|Tel|0120|\d{2,4}-\d{2,4}-\d{4}/.test(l));
+    const headerLines = telIdx >= 0 ? lines.slice(0, telIdx) : lines.slice(0, Math.min(6, lines.length));
+    const isAddress = l => /[都道府県市区町村]|〒|\d{1,4}-\d{1,4}/.test(l);
+    for (const l of headerLines) {
+      if (/^\d+$/.test(l)) continue;
+      if (isAddress(l)) continue;
+      if ((l.match(/\d/g) || []).length / l.length > 0.5) continue;
+      if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(l) || /[A-Za-z]/.test(l)) {
+        storeName = l.trim();
+        break;
+      }
+    }
+
+    // ── 合計金額抽出 ──────────────────────────────────────────────
+    // 「合計」を含む行の末尾金額を収集し最大値を採用
+    let totalAmount = 0;
+    for (const l of lines) {
+      if (!/合計/.test(l)) continue;
+      const m = l.match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
+      if (m) {
+        const v = parseInt(m[1].replace(/,/g, ''), 10);
+        if (v > totalAmount) totalAmount = v;
+      }
+    }
+
+    // ── 商品抽出 ──────────────────────────────────────────────────
+    const SKIP = /小計|合計|消費税|内税|外税|税率|税額|お釣|つり|お預|預り|ご利用|ポイント|割引|値引|クーポン|支払/;
+    const TEL  = /TEL|tel|Tel|0120|\d{2,4}-\d{2,4}-\d{4}/;
+    const seen  = new Set();
+    const items = [];
+
+    for (const line of lines) {
       if (SKIP.test(line)) continue;
+      if (TEL.test(line)) continue;              // 電話番号行除外
+      if (/^\d+$/.test(line)) continue;          // 数字のみ除外
+      if (/\d{10,}/.test(line)) continue;        // 登録番号・長い連続数字除外
+      if (/@\d+\s*\d+点/.test(line)) continue;   // 単価情報（@150 1点）除外
 
-      // 行末の価格を抽出（2〜4 桁、またはカンマ区切り例: 1,200）
+      // 行末の価格を抽出（10〜99,999円、カンマ区切り対応）
       const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,4})\s*円?\s*$/);
       if (!priceMatch) continue;
 
       const price = parseInt(priceMatch[1].replace(',', ''), 10);
       if (price < 10 || price >= 100_000) continue;
 
-      // 価格部分を除いた残りを商品名候補に
+      // 商品名クリーニング
       let name = line.slice(0, line.length - priceMatch[0].length).trim();
-
-      // ① 先頭の JAN コード（8〜13 桁の連続数字）を除去
-      name = name.replace(/^\d{8,13}\s*/, '');
-
-      // ② 「0000※」「00001 」のような短い数字コードを除去
-      name = name.replace(/^\d{3,7}[※\s]\s*/, '');
-
-      // ③ 先頭に残った孤立した数字（スペース区切り）を除去
-      name = name.replace(/^\d+\s+/, '');
-
-      // ④ 不要な記号を除去（※ \ ＼ × ÷ ☆ ★ ● ○ ■ ◆ ▶ | など）
-      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, '');
-
-      // ⑤ 先頭・末尾の非文字ノイズを除去（日本語・英数字以外の記号）
+      name = name.replace(/^\d{8,13}\s*/, '');                        // ① JANコード除去
+      name = name.replace(/^\d{3,7}[※\s]\s*/, '');                   // ② 短い数字コード除去
+      name = name.replace(/^\d+\s+/, '');                             // ③ 先頭の孤立数字除去
+      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽＊*~～｜|]+/g, ''); // ④ 記号除去
       name = name
-        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')
-        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');
-
-      // ⑥ 連続スペースを整理
-      name = name.replace(/\s{2,}/g, ' ').trim();
+        .replace(/^[^\w\u3040-\u30FF\u4E00-\u9FFF]+/, '')            // ⑤ 先頭ノイズ除去
+        .replace(/[^\w\u3040-\u30FF\u4E00-\u9FFF）)ー]+$/, '');      // ⑤ 末尾ノイズ除去
+      name = name.replace(/\s{2,}/g, ' ').trim();                     // ⑥ 連続スペース整理
 
       if (!name) continue;
 
       const key = `${name}:${price}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      results.push({ name, price });
+      items.push({ name, price });
     }
 
-    return results;
+    return { storeName, totalAmount, items };
   }
 
   // ── 商品リスト操作 ────────────────────────────────────────────
@@ -1089,6 +1111,57 @@
     const rem  = item.price % sel.length;
     sel.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
     return shares;
+  }
+
+  /**
+   * レシート合計に基づく割り勘計算。
+   *
+   * 商品按分の合計とレシート合計の差額（税・値引き端数など）を
+   * 各人の購入金額比率で按分し、四捨五入の端数は支払者に集約する。
+   * 最終的に全員の合計がレシート合計と完全一致することを保証する。
+   *
+   * @param {Array}  itemList     - items 配列（price + checked を持つオブジェクト）
+   * @param {number} receiptTotal - レシート合計金額（parseReceiptItems の totalAmount）
+   * @param {string} [payer]      - 端数調整を受けるメンバーキー（default: 'me'）
+   * @returns {Object}            - メンバーキーごとの最終負担額 { me, a, b, c }
+   */
+  function calcSplitByReceipt(itemList, receiptTotal, payer = 'me') {
+    const keys = MEMBERS.map(m => m.key);
+
+    // 1. 各人の商品合計（既存の calcShares を再利用）
+    const raw = {};
+    keys.forEach(k => (raw[k] = 0));
+    for (const item of itemList) {
+      const sh = calcShares(item);
+      keys.forEach(k => (raw[k] += sh[k]));
+    }
+
+    // 2. 差額算出（税・端数・値引きなどによるズレ）
+    const itemsTotal = keys.reduce((s, k) => s + raw[k], 0);
+    const diff = receiptTotal - itemsTotal;
+
+    if (diff === 0) return { ...raw };
+
+    // 3. 差額を購入金額比率で按分 → 四捨五入
+    const adj = {};
+    if (itemsTotal > 0) {
+      keys.forEach(k => {
+        adj[k] = Math.round((raw[k] / itemsTotal) * diff);
+      });
+    } else {
+      // 全員0円（商品なし）→ 支払者が全額負担
+      keys.forEach(k => (adj[k] = 0));
+      adj[payer] = diff;
+    }
+
+    // 4. 四捨五入による端数ズレを支払者に加減
+    const adjSum = keys.reduce((s, k) => s + adj[k], 0);
+    adj[payer] += diff - adjSum;
+
+    // 5. 最終金額（全員合計 === receiptTotal を保証）
+    const finals = {};
+    keys.forEach(k => (finals[k] = raw[k] + adj[k]));
+    return finals;
   }
 
   // 商品カードに表示する割り勘ヒント文を返す
