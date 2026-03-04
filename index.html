@@ -1025,23 +1025,21 @@
       return /^[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/.test(line);
     }
 
-    // ── 前処理: 合計行以降を削除（支払情報を除外） ────────────────
-    let cutIdx = allLines.length;
-    let finalTotalLine = null; // 最終合計金額が記載されている行
+    // ── 前処理: 最終合計行インデックスの特定 ────────────────────────
+    // finalTotalLineIdx: 解析を停止する行のインデックス（allLines基準）
+    // この行を処理した時点でそれ以降の解析は完全に停止する
+    let finalTotalLineIdx = -1;
     for (let i = 0; i < allLines.length; i++) {
       if (allLines[i] && isTotalLine(allLines[i])) {
         if (extractPrice(allLines[i]) !== null) {
           // 合計行自体に金額あり → その行が最終合計
-          cutIdx = i + 1;
-          finalTotalLine = allLines[i];
+          finalTotalLineIdx = i;
         } else {
           // 合計行に金額なし → 直下の「単独の金額のみの行」を最終合計とする
-          cutIdx = i + 1; // デフォルト：合計行まで
           for (let j = i + 1; j < allLines.length; j++) {
             if (!allLines[j]) continue;
             if (isPureAmountLine(allLines[j])) {
-              cutIdx = j + 1;
-              finalTotalLine = allLines[j];
+              finalTotalLineIdx = j;
               break;
             }
           }
@@ -1049,7 +1047,9 @@
         break;
       }
     }
-    const lines    = allLines.slice(0, cutIdx);
+    // 店名・totalAmount 抽出用に最終合計行まで（含む）をスライス
+    const cutIdx = finalTotalLineIdx >= 0 ? finalTotalLineIdx + 1 : allLines.length;
+    const lines  = allLines.slice(0, cutIdx);
     const nonEmpty = lines.filter(l => l.length > 0);
 
     // ── ヘルパー関数 ──────────────────────────────────────────────
@@ -1134,10 +1134,10 @@
     }
 
     // ── 合計金額抽出 ──────────────────────────────────────────────
-    // 前処理で特定した finalTotalLine から金額を取得
+    // 前処理で特定した finalTotalLineIdx の行から金額を取得
     let totalAmount = 0;
-    if (finalTotalLine) {
-      const m = finalTotalLine.match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
+    if (finalTotalLineIdx >= 0) {
+      const m = allLines[finalTotalLineIdx].match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
       if (m) totalAmount = parseInt(m[1].replace(/,/g, ''), 10);
     }
 
@@ -1156,7 +1156,13 @@
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!line)            continue;
+      if (!line) continue;
+
+      // ── 「合計」を最終終了トリガーとする ──────────────────────────
+      // finalTotalLineIdx に達した時点で解析を完全に停止（break）
+      // 後続の登録番号・決済方法・ポイント・再度の合計は一切解析しない
+      if (finalTotalLineIdx >= 0 && i >= finalTotalLineIdx) break;
+
       if (isSkipLine(line)) continue;
 
       // 行末の価格を確認
@@ -1179,6 +1185,8 @@
       // 1行完結型の行（名前＋価格）の価格は借りない
       if (namePart.length > 0) {
         for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+          // 最終合計行以降の価格は参照しない
+          if (finalTotalLineIdx >= 0 && j >= finalTotalLineIdx) break;
           const nextLine = lines[j];
           if (!nextLine)                  continue; // 空行はスキップ
           if (!isPriceOnlyLine(nextLine)) continue; // 名前+価格行の価格は借りない
