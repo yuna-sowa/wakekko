@@ -1017,19 +1017,31 @@
       return /合計|TOTAL|Total/.test(l) && !/小計|SUBTOTAL/i.test(l);
     }
 
+    // 「単独の金額のみの行」か（行全体が金額だけで構成される）
+    // ※（内消費税等）・税率・支払情報は除外
+    function isPureAmountLine(line) {
+      if (!line) return false;
+      if (/内消費税|税率|コード決済|クレジット/.test(line)) return false;
+      return /^[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/.test(line);
+    }
+
     // ── 前処理: 合計行以降を削除（支払情報を除外） ────────────────
     let cutIdx = allLines.length;
+    let finalTotalLine = null; // 最終合計金額が記載されている行
     for (let i = 0; i < allLines.length; i++) {
       if (allLines[i] && isTotalLine(allLines[i])) {
-        // 合計行自体に金額があればそこで打ち切り
         if (extractPrice(allLines[i]) !== null) {
+          // 合計行自体に金額あり → その行が最終合計
           cutIdx = i + 1;
+          finalTotalLine = allLines[i];
         } else {
-          // 合計行に金額がない場合、次の2行以内で金額行を探す
+          // 合計行に金額なし → 直下の「単独の金額のみの行」を最終合計とする
           cutIdx = i + 1; // デフォルト：合計行まで
-          for (let j = i + 1; j <= i + 2 && j < allLines.length; j++) {
-            if (allLines[j] && extractPrice(allLines[j]) !== null) {
-              cutIdx = j + 1; // 金額行の次から削除
+          for (let j = i + 1; j < allLines.length; j++) {
+            if (!allLines[j]) continue;
+            if (isPureAmountLine(allLines[j])) {
+              cutIdx = j + 1;
+              finalTotalLine = allLines[j];
               break;
             }
           }
@@ -1122,15 +1134,11 @@
     }
 
     // ── 合計金額抽出 ──────────────────────────────────────────────
-    // 「合計」行（小計除く）の末尾金額の最大値を採用
+    // 前処理で特定した finalTotalLine から金額を取得
     let totalAmount = 0;
-    for (const l of nonEmpty) {
-      if (!isTotalLine(l)) continue;
-      const m = l.match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
-      if (m) {
-        const v = parseInt(m[1].replace(/,/g, ''), 10);
-        if (v > totalAmount) totalAmount = v;
-      }
+    if (finalTotalLine) {
+      const m = finalTotalLine.match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
+      if (m) totalAmount = parseInt(m[1].replace(/,/g, ''), 10);
     }
 
     // ── 商品抽出 ──────────────────────────────────────────────────
