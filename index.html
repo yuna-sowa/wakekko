@@ -1021,7 +1021,19 @@
     let cutIdx = allLines.length;
     for (let i = 0; i < allLines.length; i++) {
       if (allLines[i] && isTotalLine(allLines[i])) {
-        cutIdx = i + 1; // 合計行自体は含める
+        // 合計行自体に金額があればそこで打ち切り
+        if (extractPrice(allLines[i]) !== null) {
+          cutIdx = i + 1;
+        } else {
+          // 合計行に金額がない場合、次の2行以内で金額行を探す
+          cutIdx = i + 1; // デフォルト：合計行まで
+          for (let j = i + 1; j <= i + 2 && j < allLines.length; j++) {
+            if (allLines[j] && extractPrice(allLines[j]) !== null) {
+              cutIdx = j + 1; // 金額行の次から削除
+              break;
+            }
+          }
+        }
         break;
       }
     }
