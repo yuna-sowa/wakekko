@@ -1069,6 +1069,8 @@
     // 商品名候補として除外すべき行か
     function isSkipLine(line) {
       if (!line)                                    return true;
+      // 条件A: 識別情報・支払情報を含む行
+      if (/登録番号|電話番号|伝票番号|端末番号|カード|加盟店/.test(line)) return true;
       if (/^[@＠]/.test(line))                      return true; // @で始まる（単価情報）
       if (/ポイント|値引き?|消費税/.test(line))      return true; // 除外キーワード
       if (/[△\-－]\s*[\d,]+\s*円?\s*$/.test(line)) return true; // マイナス金額
@@ -1107,6 +1109,7 @@
     // 商品名として無効か
     function isInvalidName(name) {
       if (!name || name.length === 0)              return true;
+      if (/^\d+\s*(点|個|枚|本|袋)?$/.test(name)) return true; // 数量のみ（条件3）
       if (/ポイント|値引き?|消費税|合計|小計/.test(name)) return true;
       if (DATE_PAT.test(name))                     return true;
       if (TIME_PAT.test(name))                     return true;
@@ -1158,46 +1161,25 @@
       const line = lines[i];
       if (!line) continue;
 
-      // ── 「合計」を最終終了トリガーとする ──────────────────────────
-      // finalTotalLineIdx に達した時点で解析を完全に停止（break）
-      // 後続の登録番号・決済方法・ポイント・再度の合計は一切解析しない
+      // 「合計」を最終終了トリガーとする
       if (finalTotalLineIdx >= 0 && i >= finalTotalLineIdx) break;
 
       if (isSkipLine(line)) continue;
 
-      // 行末の価格を確認
+      // 条件B: 行末に価格が存在するか
       const inlinePrice = extractPrice(line);
-      const priceMatch  = inlinePrice !== null
-        ? line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/)
-        : null;
-      const namePart = (priceMatch
-        ? line.slice(0, line.length - priceMatch[0].length)
-        : line).trim();
+      if (inlinePrice === null) continue;
 
-      if (inlinePrice !== null && namePart.length > 0) {
-        // ── パターン①: 1行完結（同一行に商品名と価格）──────────────
-        pushItem(namePart, inlinePrice);
-        continue;
-      }
+      const priceMatch = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{2,5})\s*円?\s*$/);
+      const namePart   = line.slice(0, line.length - priceMatch[0].length).trim();
 
-      // ── パターン②: 名前候補行 ────────────────────────────────────
-      // 次の2行以内に「価格のみ行」があれば商品として登録する
-      // 1行完結型の行（名前＋価格）の価格は借りない
-      if (namePart.length > 0) {
-        for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
-          // 最終合計行以降の価格は参照しない
-          if (finalTotalLineIdx >= 0 && j >= finalTotalLineIdx) break;
-          const nextLine = lines[j];
-          if (!nextLine)                  continue; // 空行はスキップ
-          if (!isPriceOnlyLine(nextLine)) continue; // 名前+価格行の価格は借りない
-          const nextPrice = extractPrice(nextLine);
-          if (nextPrice !== null) {
-            pushItem(namePart, nextPrice);
-            break;
-          }
-        }
-        // 2行以内に価格のみ行がなければ商品として登録しない
-      }
+      // 条件C: 価格の前に商品名が必要（価格のみ行は商品ではない）
+      if (namePart.length === 0) continue;
+
+      // 条件2: 合計金額と完全一致する金額は除外
+      if (totalAmount > 0 && inlinePrice === totalAmount) continue;
+
+      pushItem(namePart, inlinePrice);
     }
 
     return { storeName, totalAmount, items };
