@@ -987,6 +987,7 @@
 
   /**
    * OCR テキストから店名・合計・商品一覧を抽出して返す。
+   * OCR崩れを前提とし、金額アンカー方式で商品を検出する。
    *
    * @param {string} text - Vision API の fullTextAnnotation.text
    * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
@@ -1000,175 +1001,201 @@
         .trim()
     );
 
-    // ── 禁止ワード ──────────────────────────────────────────────────
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税/;
-
-    // ── 対象範囲の特定 ──────────────────────────────────────────────
-    // 「合計」または「お買い上げ」を含む行で停止。「税合計」はスルー。
-    let cutIdx = allLines.length;
-    let totalLineIdx = -1;
+    // ■ 1. 解析範囲の特定
+    // 終了ワードを含む行で解析を終了（ただし税合計・消費税・税額計はスルー）
+    const END_RE  = /合計|ご計|お買上|お買い上げ|総合計|今回計/;
+    const SKIP_RE = /税合計|消費税|税額計/;
+    let cutIdx = allLines.length, totalLineIdx = -1;
     for (let i = 0; i < allLines.length; i++) {
       const l = allLines[i];
-      if (!l) continue;
-      if (/税合計/.test(l)) continue; // 税合計はスルー
-      if (/合計|お買い上げ/.test(l)) {
-        cutIdx = i;
-        totalLineIdx = i;
-        break;
-      }
-    }
-    const lines = allLines.slice(0, cutIdx);
-
-    // ── ヘルパー関数 ──────────────────────────────────────────────
-    const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}/;
-    const TIME_PAT = /\d{2}:\d{2}/;
-
-    // 行末の正の金額を返す（7桁以上の連続数字は除外）
-    function extractAmount(line) {
-      if (!line) return null;
-      if (/\d{7,}/.test(line)) return null;
-      const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
-      if (!m) return null;
-      const v = parseInt(m[1].replace(/,/g, ''), 10);
-      return v > 0 ? v : null;
+      if (!l || SKIP_RE.test(l)) continue;
+      if (END_RE.test(l)) { cutIdx = i; totalLineIdx = i; break; }
     }
 
-    // マイナス金額を返す（負の値として）
-    function extractNegAmount(line) {
-      if (!line) return null;
-      const m = line.match(/[△\-－]\s*[¥￥]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
-      if (!m) return null;
-      return -parseInt(m[1].replace(/,/g, ''), 10);
-    }
-
-    // B型 金額行か（行末が金額形式 & 商品名文字を含まない）
-    function isPriceLine(line) {
-      if (!line) return false;
-      if (/\d{7,}/.test(line)) return false;
-      const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
-      if (!m) return false;
-      const prefix = line.slice(0, line.length - m[0].length).trim();
-      // 商品名文字（日本語・英字）がなければ金額行
-      return !/[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(prefix);
-    }
-
-    // B型 商品名行か（日本語または英字を含む & 金額なし & 禁止ワードなし）
-    function isNameLine(line) {
-      if (!line) return false;
-      if (FORBIDDEN.test(line)) return false;
-      if (extractAmount(line) !== null) return false;
-      return /[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(line);
-    }
-
-    // 商品名クリーニング
-    function cleanName(raw) {
-      let name = raw;
-      name = name.replace(/^[＊*]\s*/, '');
-      name = name.replace(/^\d{8,13}\s*/, '');
-      name = name.replace(/^\d{3,7}[\s※]\s*/, '');
-      name = name.replace(/^\d+\s+/, '');
-      name = name.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽~～｜|]+/g, '');
-      name = name.replace(/\s{2,}/g, ' ').trim();
-      return name;
-    }
-
-    // ── 合計金額抽出 ──────────────────────────────────────────────
+    // 合計金額抽出（終了行、または直後3行以内の単独金額行から取得）
     let totalAmount = 0;
     if (totalLineIdx >= 0) {
-      const m = allLines[totalLineIdx].match(/[¥￥]?\s*([\d,]+)\s*円?\s*$/);
-      if (m) {
-        totalAmount = parseInt(m[1].replace(/,/g, ''), 10);
-      }
-      // 合計行自体に金額がない場合は直後の行を確認
+      const m = allLines[totalLineIdx].match(/[¥￥\\]?\s*([\d,]+)\s*$/);
+      if (m) totalAmount = parseInt(m[1].replace(/,/g, ''), 10);
       if (!totalAmount) {
         for (let j = totalLineIdx + 1; j < Math.min(totalLineIdx + 4, allLines.length); j++) {
           if (!allLines[j]) continue;
-          const m2 = allLines[j].match(/^[¥￥]?\s*([\d,]+)\s*円?\s*$/);
+          const m2 = allLines[j].match(/^[¥￥\\]?\s*([\d,]+)\s*$/);
           if (m2) { totalAmount = parseInt(m2[1].replace(/,/g, ''), 10); break; }
         }
       }
     }
 
-    // ── 店名抽出 ──────────────────────────────────────────────────
+    // ■ 2. 前処理：行ノイズの除去
+    // 棚番号・分類番号（例：ソ#02、リ#05、#05）を行頭から除去
+    const SHELF_RE = /^[ァ-ヶA-Za-z]*#\d+\s*/;
+    const rawLines = allLines.slice(0, cutIdx);
+    // lines[i]: null=ノイズ行（(・*・_ で始まる）, ''=空行, 文字列=処理済み行
+    const lines = rawLines.map(l => {
+      if (!l) return '';
+      if (/^[\(\*_]/.test(l)) return null;
+      return l.replace(SHELF_RE, '').trim();
+    });
+
+    // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
+    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税額|消費税|対象額|税込|点/;
+
+    const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}/;
+    const TIME_PAT = /\d{2}:\d{2}/;
+    // 金額プレフィックス（¥・￥・\）
+    const YEN_RE = /[¥￥\\]/;
+
+    // ── ヘルパー関数 ─────────────────────────────────────────────
+
+    // 行末の正の金額を返す（8桁以上の連続数字は除外）
+    function extractAmt(line) {
+      if (!line) return null;
+      if (/\d{8,}/.test(line)) return null;
+      const m = line.match(/[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
+      if (!m) return null;
+      const v = parseInt(m[1].replace(/,/g, ''), 10);
+      return v > 0 ? v : null;
+    }
+
+    // マイナス金額行か（-50 -100 ▲30 など）→ 負の値を返す
+    function extractNegAmt(line) {
+      if (!line) return null;
+      const m = line.match(/[△▲\-－]\s*[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
+      if (!m) return null;
+      return -parseInt(m[1].replace(/,/g, ''), 10);
+    }
+
+    // 金額行か（行末が金額形式で終わる）
+    function isPriceLine(line) {
+      if (!line) return false;
+      if (/\d{8,}/.test(line)) return false;
+      return /[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/.test(line);
+    }
+
+    // A型検出：行末の金額を除いた「商品名プレフィックス」を返す（なければnull）
+    // ¥68 2個 のような単価+数量パターンも除去したうえで日本語・英字が残るか確認
+    function getPrefix(line) {
+      if (!line || FORBIDDEN.test(line)) return null;
+      const m = line.match(/[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
+      if (!m) return null;
+      const prefix = line.slice(0, line.length - m[0].length).trim();
+      // 数量ワード・単価記号を除いた核が商品名文字を含むか確認
+      const core = prefix
+        .replace(/[¥￥\\]?\s*\d[\d,]*\s*[個点本枚袋]/g, '')
+        .replace(/[¥￥\\]\s*\d[\d,]*/g, '')
+        .replace(/\d+\s*[個点本枚袋]/g, '')
+        .trim();
+      if (!/[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(core)) return null;
+      return prefix;
+    }
+
+    // 商品名として有効な行か
+    // 数量ワード・金額記号を除いた核に日本語・英字が残ることを確認
+    function isValidName(line) {
+      if (!line || FORBIDDEN.test(line)) return false;
+      if (/\d{8,}/.test(line) || DATE_PAT.test(line) || TIME_PAT.test(line)) return false;
+      const core = line
+        .replace(/[¥￥\\]?\s*\d[\d,]*\s*[個点本枚袋]/g, '')
+        .replace(/[¥￥\\]\s*\d[\d,]*/g, '')
+        .replace(/\d+\s*[個点本枚袋]/g, '')
+        .trim();
+      return /[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(core);
+    }
+
+    // 商品名クリーニング（記号・JANコード・単価+数量・末尾金額などを除去）
+    function cleanName(raw) {
+      let n = raw;
+      n = n.replace(/^[＊*]\s*/, '');                          // 先頭 * 除去
+      n = n.replace(/^\d{8,13}\s*/, '');                       // JANコード除去
+      n = n.replace(/^\d{3,7}[\s※]\s*/, '');                  // 短い番号コード除去
+      n = n.replace(/^\d+\s+/, '');                            // 先頭孤立数字除去
+      n = n.replace(/\s*[¥￥\\]\s*\d[\d,]*\s*\d*\s*[個点本枚袋].*$/g, '').trim(); // 単価+数量パターン除去
+      n = n.replace(/\s*\d+\s*[個点本枚袋]\s*$/g, '').trim(); // 末尾の数量除去
+      n = n.replace(/\s*[¥￥\\]?\s*\d[\d,]*\s*円?\s*$/g, '').trim(); // 末尾の金額除去
+      n = n.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽~～｜|]+/g, '');
+      n = n.replace(/\s{2,}/g, ' ').trim();
+      return n;
+    }
+
+    // ── 店名抽出（上から5行の非空行で条件を満たす最初の行）──────────
     let storeName = '';
-    const nonEmpty = lines.filter(l => l.length > 0);
+    const nonEmpty = lines.filter(l => l && l.length > 0);
     for (let i = 0; i < Math.min(5, nonEmpty.length); i++) {
       const l = nonEmpty[i];
       if (/合計|小計|TEL|tel/.test(l)) continue;
-      if (DATE_PAT.test(l)) continue;
-      if (TIME_PAT.test(l)) continue;
+      if (DATE_PAT.test(l) || TIME_PAT.test(l)) continue;
       if (/^\d+$/.test(l)) continue;
-      if (extractAmount(l) !== null) continue;
+      if (isPriceLine(l) && !getPrefix(l)) continue;
       storeName = l;
       break;
     }
 
-    // ── 商品抽出 ──────────────────────────────────────────────────
-    const items = [];
-    const seen  = new Set();
+    // ■ 4. 商品抽出（金額アンカー方式）
+    // 金額行を起点に、上方向へ最大3行遡って商品名を取得する
+    const items   = [];
+    const seen    = new Set();
+    const usedIdx = new Set(); // 商品名として使用済みの行インデックス
 
     function addItem(name, price) {
-      const cleaned = cleanName(name);
-      if (!cleaned || cleaned.length === 0) return false;
-      if (totalAmount > 0 && price === totalAmount) return false; // D: 合計と同額除外
-      const key = `${cleaned}:${price}`;
+      const c = cleanName(name);
+      if (!c || !isValidName(c)) return false;
+      if (totalAmount > 0 && price === totalAmount) return false; // ■ 6. 合計行除外
+      const key = `${c}:${price}`;
       if (seen.has(key)) return false;
       seen.add(key);
-      items.push({ name: cleaned, price });
+      items.push({ name: c, price });
       return true;
+    }
+
+    // 上方向探索：fromIdx から上に最大3行（ノイズ行はカウント外）で商品名を探す
+    function findNameAbove(fromIdx) {
+      let checked = 0;
+      for (let j = fromIdx; j >= 0 && checked < 3; j--) {
+        const l = lines[j];
+        if (l === null) continue; // ノイズ行（カウントしない）
+        checked++;
+        if (!l) continue; // 空行はスキップ
+        if (usedIdx.has(j)) break; // 使用済み行で探索終了
+        if (isValidName(l)) { usedIdx.add(j); return l; }
+      }
+      return null;
     }
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      if (!line) continue;
+      if (line === null || line === '') continue;
 
-      // C: マイナス金額行の処理
-      const negAmt = extractNegAmount(line);
+      // ■ 5. 割引処理（マイナス金額行）
+      const negAmt = extractNegAmt(line);
       if (negAmt !== null) {
         if (items.length > 0) {
-          // 直前の商品に紐づけて金額を上書き
+          // 直前の商品に紐づけて金額を減算（0以下になれば商品ごと削除）
           const last = items[items.length - 1];
-          const newPrice = last.price + negAmt;
+          const np = last.price + negAmt;
           seen.delete(`${last.name}:${last.price}`);
-          if (newPrice > 0) {
-            last.price = newPrice;
-            seen.add(`${last.name}:${newPrice}`);
-          } else {
-            items.pop();
-          }
+          if (np > 0) { last.price = np; seen.add(`${last.name}:${np}`); }
+          else items.pop();
         }
-        // 直前が商品でなければ会計割引（calcSplitByReceiptで按分される）
+        // 直前が商品でなければ会計割引（calcSplitByReceiptの差額按分で自動対応）
         continue;
       }
 
-      // A型: 1行完結型（禁止ワードなし & 行末が金額 & 商品名部分あり）
-      if (!FORBIDDEN.test(line)) {
-        const price = extractAmount(line);
-        if (price !== null) {
-          const m = line.match(/[¥￥]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
-          const prefix = m ? line.slice(0, line.length - m[0].length).trim() : '';
-          if (prefix.length > 0 && /[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(prefix)) {
-            addItem(prefix, price);
-            continue;
-          }
-        }
+      // 金額行でなければスキップ
+      if (!isPriceLine(line)) continue;
+
+      // A型：行内に商品名プレフィックスあり（「国産若鶏モモミンチ ¥347」など）
+      const prefix = getPrefix(line);
+      if (prefix) {
+        addItem(prefix, extractAmt(line));
+        usedIdx.add(i); // A型行を使用済みとしてマーク
+        continue;
       }
 
-      // B型: 2行ペア型（商品名行 + 金額行）
-      if (isNameLine(line)) {
-        let priceLineIdx = -1;
-        if (i + 1 < lines.length && isPriceLine(lines[i + 1])) {
-          priceLineIdx = i + 1;
-        } else if (i + 2 < lines.length && isPriceLine(lines[i + 2])) {
-          priceLineIdx = i + 2;
-        }
-        if (priceLineIdx >= 0) {
-          const price = extractAmount(lines[priceLineIdx]);
-          if (price !== null) {
-            addItem(line, price);
-            i = priceLineIdx; // 金額行をスキップ
-          }
-        }
+      // B型 + 金額アンカー方式：上方向に商品名を探す
+      const price = extractAmt(line);
+      if (price !== null) {
+        const name = findNameAbove(i - 1);
+        if (name) addItem(name, price);
       }
     }
 
