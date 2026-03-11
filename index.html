@@ -1184,6 +1184,9 @@
       // 金額行でなければスキップ
       if (!isPriceLine(line)) continue;
 
+      // 日付・時刻行はスキップ（例: 2024/03/12、10:30 が金額として誤抽出されるのを防ぐ）
+      if (DATE_PAT.test(line) || TIME_PAT.test(line)) continue;
+
       // ■ NEW: @単価パターン（「商品名 @単価 数量 合計」形式）
       // 例: キャラメルポップコーン @150 1 1点 150 → 商品名: キャラメルポップコーン, 金額: 150
       const atIdx = line.search(/@\d/);
