@@ -1030,10 +1030,11 @@
     // 棚番号・分類番号（例：ソ#02、リ#05、#05）を行頭から除去
     const SHELF_RE = /^[ァ-ヶA-Za-z]*#\d+\s*/;
     const rawLines = allLines.slice(0, cutIdx);
-    // lines[i]: null=ノイズ行（(・*・_ で始まる）, ''=空行, 文字列=処理済み行
+    // lines[i]: null=ノイズ行（( または _ で始まる）, ''=空行, 文字列=処理済み行
+    // ※ * で始まる行は商品名の可能性があるためノイズ扱いしない（例: *コアラパン）
     const lines = rawLines.map(l => {
       if (!l) return '';
-      if (/^[\(\*_]/.test(l)) return null;
+      if (/^[(_]/.test(l)) return null;
       return l.replace(SHELF_RE, '').trim();
     });
 
@@ -1182,6 +1183,21 @@
 
       // 金額行でなければスキップ
       if (!isPriceLine(line)) continue;
+
+      // ■ NEW: @単価パターン（「商品名 @単価 数量 合計」形式）
+      // 例: キャラメルポップコーン @150 1 1点 150 → 商品名: キャラメルポップコーン, 金額: 150
+      const atIdx = line.search(/@\d/);
+      if (atIdx > 0) {
+        const price = extractAmt(line);
+        if (price !== null) {
+          const namePart = line.slice(0, atIdx).trim();
+          if (namePart) {
+            addItem(namePart, price);
+            usedIdx.add(i);
+            continue;
+          }
+        }
+      }
 
       // A型：行内に商品名プレフィックスあり（「国産若鶏モモミンチ ¥347」など）
       const prefix = getPrefix(line);
