@@ -1162,22 +1162,16 @@
       return true;
     }
 
-    // 上方向探索：fromIdx から上に最大(3+skip)行（ノイズ行はカウント外）で商品名を探す
-    // skip: 有効な名前行を何件飛ばすか（連続金額ブロック対応）
-    function findNameAbove(fromIdx, skip = 0) {
+    // 上方向探索：fromIdx から上に最大3行（ノイズ行はカウント外）で商品名を探す
+    function findNameAbove(fromIdx) {
       let checked = 0;
-      let skipped = 0;
-      for (let j = fromIdx; j >= 0 && checked < skip + 6; j--) {
+      for (let j = fromIdx; j >= 0 && checked < 3; j--) {
         const l = lines[j];
         if (l === null) continue; // ノイズ行（カウントしない）
         checked++;
         if (!l) continue; // 空行はスキップ
         if (usedIdx.has(j)) break; // 使用済み行で探索終了
-        if (isValidName(l)) {
-          if (skipped < skip) { skipped++; continue; } // skip件は飛ばす
-          usedIdx.add(j);
-          return l;
-        }
+        if (isValidName(l)) { usedIdx.add(j); return l; }
       }
       return null;
     }
@@ -1231,17 +1225,9 @@
       }
 
       // B型 + 金額アンカー方式：上方向に商品名を探す
-      // 連続する金額ブロックの場合、後続の金額行数だけ名前をスキップして対応する名前を取得
       const price = extractAmt(line);
       if (price !== null) {
-        let following = 0;
-        for (let k = i + 1; k < lines.length; k++) {
-          const next = lines[k];
-          if (next === null || next === '') continue;
-          if (isPriceLine(next) && !DATE_PAT.test(next) && !TIME_PAT.test(next)) following++;
-          else break;
-        }
-        const name = findNameAbove(i - 1, following);
+        const name = findNameAbove(i - 1);
         if (name) addItem(name, price);
       }
     }
