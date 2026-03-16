@@ -1049,28 +1049,30 @@
     // ── ヘルパー関数 ─────────────────────────────────────────────
 
     // 行末の正の金額を返す（8桁以上の連続数字は除外）
+    // ¥ ￥ \ * をプレフィックスとして許容、, . を桁区切りとして除去
+    // 例: *1.200 → 1200、¥1,200 → 1200
     function extractAmt(line) {
       if (!line) return null;
       if (/\d{8,}/.test(line)) return null;
-      const m = line.match(/[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
+      const m = line.match(/[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
       if (!m) return null;
-      const v = parseInt(m[1].replace(/,/g, ''), 10);
+      const v = parseInt(m[1].replace(/[,.]/g, ''), 10);
       return v > 0 ? v : null;
     }
 
     // マイナス金額行か（-50 -100 ▲30 など）→ 負の値を返す
     function extractNegAmt(line) {
       if (!line) return null;
-      const m = line.match(/[△▲\-－]\s*[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/);
+      const m = line.match(/[△▲\-－]\s*[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
       if (!m) return null;
-      return -parseInt(m[1].replace(/,/g, ''), 10);
+      return -parseInt(m[1].replace(/[,.]/g, ''), 10);
     }
 
     // 金額行か（行末が金額形式で終わる）
     function isPriceLine(line) {
       if (!line) return false;
       if (/\d{8,}/.test(line)) return false;
-      return /[¥￥\\]?\s*(\d{1,2},\d{3}|\d{1,6})\s*円?\s*$/.test(line);
+      return /[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/.test(line);
     }
 
     // A型検出：行末の金額を除いた「商品名プレフィックス」を返す（なければnull）
