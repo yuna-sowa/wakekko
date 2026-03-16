@@ -1232,13 +1232,15 @@
 
       // B型 + 金額アンカー方式：上方向に商品名を探す
       // 連続する金額ブロックの場合、後続の金額行数だけ名前をスキップして対応する名前を取得
+      // ※ following は「行全体が価格のみ」の純粋な価格行だけカウント
+      //   （A型izable行や**460のようなノイズ行は除外）
       const price = extractAmt(line);
       if (price !== null) {
         let following = 0;
         for (let k = i + 1; k < lines.length; k++) {
           const next = lines[k];
           if (next === null || next === '') continue;
-          if (isPriceLine(next) && !DATE_PAT.test(next) && !TIME_PAT.test(next)) following++;
+          if (/^[¥￥\\*]?\s*\d[\d,.]*\s*円?\s*$/.test(next) && !DATE_PAT.test(next) && !TIME_PAT.test(next)) following++;
           else break;
         }
         const name = findNameAbove(i - 1, following);
