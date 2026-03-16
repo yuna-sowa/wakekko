@@ -1039,7 +1039,7 @@
     });
 
     // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税額|消費税|対象額|税込|税率|外税|点/;
+    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税額|消費税|対象額|税込|点/;
 
     const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{4}年\d{1,2}月\d{1,2}日/;
     const TIME_PAT = /\d{2}:\d{2}|\d{1,2}時\d{1,2}分/;
@@ -1167,7 +1167,7 @@
     function findNameAbove(fromIdx, skip = 0) {
       let checked = 0;
       let skipped = 0;
-      for (let j = fromIdx; j >= 0 && checked < skip + 3; j--) {
+      for (let j = fromIdx; j >= 0 && checked < skip + 6; j--) {
         const l = lines[j];
         if (l === null) continue; // ノイズ行（カウントしない）
         checked++;
