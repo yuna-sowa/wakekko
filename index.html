@@ -1015,8 +1015,8 @@
     // 合計金額抽出（終了行、または直後3行以内の単独金額行から取得）
     let totalAmount = 0;
     if (totalLineIdx >= 0) {
-      const m = allLines[totalLineIdx].match(/[¥￥\\]?\s*([\d,]+)\s*$/);
-      if (m) totalAmount = parseInt(m[1].replace(/,/g, ''), 10);
+      const m = allLines[totalLineIdx].match(/[¥￥\\]?\s*([\d,.]+)\s*円?\s*$/);
+      if (m) totalAmount = parseInt(m[1].replace(/[,.]/g, ''), 10);
       if (!totalAmount) {
         for (let j = totalLineIdx + 1; j < Math.min(totalLineIdx + 4, allLines.length); j++) {
           if (!allLines[j]) continue;
@@ -1039,7 +1039,7 @@
     });
 
     // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税額|消費税|対象額|税込|軽減税率|外税|点/;
+    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券/;
 
     const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{4}年\d{1,2}月\d{1,2}日/;
     const TIME_PAT = /\d{2}:\d{2}|\d{1,2}時\d{1,2}分/;
