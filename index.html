@@ -1190,7 +1190,7 @@
       // ■ 5. 割引処理（マイナス金額行）
       const negAmt = extractNegAmt(line);
       if (negAmt !== null) {
-        if (items.length > 0) {
+        if (!FORBIDDEN.test(line) && items.length > 0) {
           // 直前の商品に紐づけて金額を減算（0以下になれば商品ごと削除）
           const last = items[items.length - 1];
           const np = last.price + negAmt;
