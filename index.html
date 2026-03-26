@@ -1020,6 +1020,7 @@
       if (!totalAmount) {
         for (let j = totalLineIdx + 1; j < Math.min(totalLineIdx + 4, allLines.length); j++) {
           if (!allLines[j]) continue;
+          if (SKIP_RE.test(allLines[j])) continue;
           const m2 = allLines[j].match(/[¥￥\\]?\s*([\d,.]+)\s*円?\s*$/);
           if (m2) { totalAmount = parseInt(m2[1].replace(/[,.]/g, ''), 10); break; }
         }
