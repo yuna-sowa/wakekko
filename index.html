@@ -1178,8 +1178,19 @@
         if (usedIdx.has(j)) break; // 使用済み行で探索終了
         if (isValidName(l)) {
           if (skipped < skip) { skipped++; continue; } // skip件は飛ばす
+          // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
+          let name = l;
+          if (/^[特並上下大小中極超高低優A-Za-z]{1,3}$/.test(cleanName(l).replace(/\s/g, ''))) {
+            for (let k = j - 1; k >= 0; k--) {
+              const above = lines[k];
+              if (above === null || above === '') continue;
+              if (usedIdx.has(k)) break;
+              if (isValidName(above)) { usedIdx.add(k); name = above + ' ' + l; }
+              break;
+            }
+          }
           usedIdx.add(j);
-          return l;
+          return name;
         }
       }
       return null;
@@ -1238,7 +1249,18 @@
       // A型：行内に商品名プレフィックスあり（「国産若鶏モモミンチ ¥347」など）
       const prefix = getPrefix(line);
       if (prefix) {
-        addItem(prefix, extractAmt(line));
+        // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
+        let finalPrefix = prefix;
+        if (/^[特並上下大小中極超高低優A-Za-z]{1,3}$/.test(cleanName(prefix).replace(/\s/g, ''))) {
+          for (let k = i - 1; k >= 0; k--) {
+            const above = lines[k];
+            if (above === null || above === '') continue;
+            if (usedIdx.has(k)) break;
+            if (isValidName(above)) { usedIdx.add(k); finalPrefix = above + ' ' + prefix; }
+            break;
+          }
+        }
+        addItem(finalPrefix, extractAmt(line));
         usedIdx.add(i); // A型行を使用済みとしてマーク
         continue;
       }
