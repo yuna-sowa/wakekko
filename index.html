@@ -1123,6 +1123,7 @@
     function isValidName(line) {
       if (!line || FORBIDDEN.test(line)) return false;
       if (/\d{8,}/.test(line) || DATE_PAT.test(line) || TIME_PAT.test(line)) return false;
+      if (/^\d+回$/.test(line.trim())) return false; // 支払回数（1回払いなど）
       const core = line
         .replace(/[¥￥\\]?\s*\d[\d,]*\s*[個点本枚袋]/g, '')
         .replace(/[¥￥\\]\s*\d[\d,]*/g, '')
