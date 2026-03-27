@@ -1006,7 +1006,7 @@
 
     // ■ 1. 解析範囲の特定
     // 終了ワードを含む行で解析を終了（ただし税合計・消費税・税額計はスルー）
-    const END_RE  = /合計|ご計|お買上|お買い上げ|総合計|今回計/;
+    const END_RE  = /合計|ご計|お買上|お買い上げ|総合計|今回計|SUBTOTAL|^TOTAL/;
     const SKIP_RE = /税合計|消費税|税額計/;
     let cutIdx = allLines.length, totalLineIdx = -1;
     for (let i = 0; i < allLines.length; i++) {
@@ -1053,7 +1053,7 @@
     });
 
     // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|会計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券|売上|VISA|Visa|通番|様|詳しくは|サービスカウンター/;
+    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|会計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券|売上|VISA|Visa|通番|様|詳しくは|サービスカウンター|TAX|IRC|CPN|B\.O\.B|SUBTOTAL/;
 
     const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{4}年\d{1,2}月\d{1,2}日/;
     const TIME_PAT = /\d{2}:\d{2}|\d{1,2}時\d{1,2}分/;
@@ -1068,7 +1068,7 @@
     function extractAmt(line) {
       if (!line) return null;
       if (/\d{8,}/.test(line)) return null;
-      const m = line.match(/[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
+      const m = line.match(/[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
       if (!m) return null;
       const v = parseInt(m[1].replace(/[,.]/g, ''), 10);
       return v > 0 ? v : null;
@@ -1086,7 +1086,7 @@
     function isPriceLine(line) {
       if (!line) return false;
       if (/\d{8,}/.test(line)) return false;
-      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
+      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
       if (!m) return false;
       // 通貨記号・桁区切りなしで直前が非空白 → 商品名の一部（例: 旨味納豆3 の末尾3）
       if (!m[1] && !/[,.]/.test(m[2])) {
@@ -1100,7 +1100,7 @@
     // ¥68 2個 のような単価+数量パターンも除去したうえで日本語・英字が残るか確認
     function getPrefix(line) {
       if (!line || FORBIDDEN.test(line)) return null;
-      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
+      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
       if (!m) return null;
       // 通貨記号・桁区切りなしで直前が非空白 → 商品名の一部（例: 旨味納豆3 の末尾3）
       if (!m[1] && !/[,.]/.test(m[2])) {
@@ -1136,6 +1136,7 @@
     function cleanName(raw) {
       let n = raw;
       n = n.replace(/^[※＊*]\s*/, '');                         // 先頭 ※ * 除去
+      n = n.replace(/^\d+@\s*/, '');                           // コストコ数量表記（1@ 2@）除去
       n = n.replace(/^\d{8,13}\s*/, '');                       // JANコード除去
       n = n.replace(/^\d{3,7}[\s※]\s*/, '');                  // 短い番号コード除去
       n = n.replace(/^\d+\s+/, '');                            // 先頭孤立数字除去
@@ -1191,7 +1192,7 @@
         }
         checked++;
         if (!l) continue; // 空行はスキップ
-        if (isValidName(l)) {
+        if (!isPriceLine(l) && isValidName(l)) {
           if (skipped < skip) { skipped++; continue; } // skip件は飛ばす
           // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
           let name = l;
