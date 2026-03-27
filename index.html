@@ -995,11 +995,12 @@
    * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
    */
   function parseReceiptItems(text) {
-    // 全角数字・全角スペースを半角に統一
+    // 全角数字・全角スペースを半角に統一、OCR誤認字を正規化
     const allLines = text.split('\n').map(raw =>
       raw
         .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
         .replace(/　/g, ' ')
+        .replace(/稅/g, '税') // 中国語繁体字「稅」(U+7A05) を日本語「税」(U+7A0E) に統一
         .trim()
     );
 
