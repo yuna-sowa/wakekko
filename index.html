@@ -1173,9 +1173,12 @@
       for (let j = fromIdx; j >= 0 && checked < skip + 3; j--) {
         const l = lines[j];
         if (l === null) continue; // ノイズ行（カウントしない）
+        if (usedIdx.has(j)) {
+          if (isPriceLine(l)) continue; // 使用済み価格行はスキップして探索継続
+          else break;                   // 使用済み名前行で探索終了
+        }
         checked++;
         if (!l) continue; // 空行はスキップ
-        if (usedIdx.has(j)) break; // 使用済み行で探索終了
         if (isValidName(l)) {
           if (skipped < skip) { skipped++; continue; } // skip件は飛ばす
           // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
@@ -1249,33 +1252,40 @@
       // A型：行内に商品名プレフィックスあり（「国産若鶏モモミンチ ¥347」など）
       const prefix = getPrefix(line);
       if (prefix) {
-        // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
-        let finalPrefix = prefix;
-        if (/^[特並上下大小中極超高低優A-Za-z]{1,3}$/.test(cleanName(prefix).replace(/\s/g, ''))) {
-          for (let k = i - 1; k >= 0; k--) {
-            const above = lines[k];
-            if (above === null || above === '') continue;
-            if (usedIdx.has(k)) break;
-            if (isValidName(above)) { usedIdx.add(k); finalPrefix = above + ' ' + prefix; }
-            break;
+        const QUALITY_RE = /^[特並上下大小中極超高低優A-Za-z]{1,3}$/;
+        if (QUALITY_RE.test(cleanName(prefix).replace(/\s/g, ''))) {
+          // 品質区分：後続の品質/純粋価格行数をカウントしてskipロジックで対応名前を探す
+          let following = 0;
+          for (let k = i + 1; k < lines.length; k++) {
+            const next = lines[k];
+            if (next === null || next === '') continue;
+            if (!isPriceLine(next) || DATE_PAT.test(next) || TIME_PAT.test(next)) break;
+            const np = getPrefix(next);
+            if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) following++;
+            else break;
           }
+          const name = findNameAbove(i - 1, following);
+          addItem(name ? name + ' ' + prefix : prefix, extractAmt(line));
+        } else {
+          addItem(prefix, extractAmt(line));
         }
-        addItem(finalPrefix, extractAmt(line));
         usedIdx.add(i); // A型行を使用済みとしてマーク
         continue;
       }
 
       // B型 + 金額アンカー方式：上方向に商品名を探す
-      // 連続する金額ブロックの場合、後続の金額行数だけ名前をスキップして対応する名前を取得
-      // ※ following は「行全体が価格のみ」の純粋な価格行だけカウント
-      //   （A型izable行や**460のようなノイズ行は除外）
+      // 連続する金額ブロックの場合、後続の価格行数だけ名前をスキップして対応する名前を取得
+      // ※ following は純粋な価格行と品質区分A型行の合計（通常のA型izable行は除外）
       const price = extractAmt(line);
       if (price !== null) {
+        const QUALITY_RE = /^[特並上下大小中極超高低優A-Za-z]{1,3}$/;
         let following = 0;
         for (let k = i + 1; k < lines.length; k++) {
           const next = lines[k];
           if (next === null || next === '') continue;
-          if (/^[¥￥\\*]?\s*\d[\d,.]*\s*円?\s*$/.test(next) && !DATE_PAT.test(next) && !TIME_PAT.test(next)) following++;
+          if (!isPriceLine(next) || DATE_PAT.test(next) || TIME_PAT.test(next)) break;
+          const np = getPrefix(next);
+          if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) following++;
           else break;
         }
         const name = findNameAbove(i - 1, following);
