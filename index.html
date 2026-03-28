@@ -1049,6 +1049,7 @@
       if (!l) return '';
       if (/^[(_]/.test(l)) return null;
       if (/^[Xx]{4,}/.test(l)) return null; // マスクカード番号（XXXXXXXXXXXX1234形式）
+      if (/^\d{1,2}$/.test(l.trim())) return null; // 1-2桁単独数字行（「1@」→「10」OCR誤認識など数量表記）をノイズとして除外
       if (/^\d{5,7}$/.test(l.trim())) return null; // 5-7桁単独数字行（コストコ商品番号等）をノイズとして除外
       if (/^\d{3,7}\s+\d+$/.test(l.trim())) return null; // 分割された商品番号（例: 93392 10）をノイズとして除外
       return l.replace(SHELF_RE, '').trim();
