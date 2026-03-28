@@ -1049,6 +1049,7 @@
       if (!l) return '';
       if (/^[(_]/.test(l)) return null;
       if (/^[Xx]{4,}/.test(l)) return null; // マスクカード番号（XXXXXXXXXXXX1234形式）
+      if (/^\d{5,7}$/.test(l.trim())) return null; // 5-7桁単独数字行（コストコ商品番号等）をノイズとして除外
       return l.replace(SHELF_RE, '').trim();
     });
 
