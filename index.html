@@ -1056,7 +1056,7 @@
     });
 
     // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|会計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券|売上|VISA|Visa|通番|様|詳しくは|サービスカウンター|TAX|IRC|CPN|B\.O\.B|SUBTOTAL|会員|BIZ/;
+    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|会計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券|売上|VISA|Visa|通番|様|詳しくは|サービスカウンター|TAX|IRC|CPN|B\.O\.B|SUBTOTAL|会員|BIZ|COUPON/;
 
     const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{4}年\d{1,2}月\d{1,2}日/;
     const TIME_PAT = /\d{2}:\d{2}|\d{1,2}時\d{1,2}分/;
@@ -1227,12 +1227,14 @@
       const negAmt = extractNegAmt(line);
       if (negAmt !== null) {
         // 当該行または直前の非空行にFORBIDDENワードがあれば割引をスキップ
+        // ただしCPN/IRC/COUPONはクーポン識別語なので割引を許可する
         let labelForbidden = FORBIDDEN.test(line);
+        if (labelForbidden && /CPN|IRC|COUPON/.test(line)) labelForbidden = false;
         if (!labelForbidden) {
           for (let k = i - 1; k >= 0; k--) {
             if (lines[k] === null) continue;
             if (lines[k] === '') continue;
-            if (/CPN|IRC/.test(lines[k])) continue; // クーポン識別行（CPN/IRC）はスキップして上を確認
+            if (/CPN|IRC|COUPON/.test(lines[k])) continue; // クーポン識別行はスキップして上を確認
             labelForbidden = FORBIDDEN.test(lines[k]);
             break;
           }
@@ -1245,6 +1247,8 @@
           if (np > 0) { last.price = np; seen.add(`${last.name}:${np}`); }
           else items.pop();
         }
+        // 割引行を使用済みとしてマーク（後続の金額行が割引行を商品名として拾わないよう）
+        usedIdx.add(i);
         // 直前が商品でなければ会計割引（calcSplitByReceiptの差額按分で自動対応）
         continue;
       }
