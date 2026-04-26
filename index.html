@@ -1171,16 +1171,12 @@
     // ■ 4. 商品抽出（金額アンカー方式）
     // 金額行を起点に、上方向へ最大3行遡って商品名を取得する
     const items   = [];
-    const seen    = new Set();
     const usedIdx = new Set(); // 商品名として使用済みの行インデックス
 
     function addItem(name, price) {
       const c = cleanName(name);
       if (!c || !isValidName(c)) return false;
       if (totalAmount > 0 && price === totalAmount) return false; // ■ 6. 合計行除外
-      const key = `${c}:${price}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
       items.push({ name: c, price });
       return true;
     }
@@ -1243,8 +1239,7 @@
           // 直前の商品に紐づけて金額を減算（0以下になれば商品ごと削除）
           const last = items[items.length - 1];
           const np = last.price + negAmt;
-          seen.delete(`${last.name}:${last.price}`);
-          if (np > 0) { last.price = np; seen.add(`${last.name}:${np}`); }
+          if (np > 0) { last.price = np; }
           else items.pop();
         }
         // 割引行を使用済みとしてマーク（後続の金額行が割引行を商品名として拾わないよう）
