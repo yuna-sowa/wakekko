@@ -1050,6 +1050,7 @@
       if (/^[(_]/.test(l)) return null;
       if (/^[Xx]{4,}/.test(l)) return null; // マスクカード番号（XXXXXXXXXXXX1234形式）
       if (/^\d{1,2}$/.test(l.trim())) return null; // 1-2桁単独数字行（「1@」→「10」OCR誤認識など数量表記）をノイズとして除外
+      if (/^\d{3,4}$/.test(l.trim())) return null; // 3-4桁単独数字行（CPNクーポン番号・割引額の表示行等）をノイズとして除外
       if (/^\d{5,7}$/.test(l.trim())) return null; // 5-7桁単独数字行（コストコ商品番号等）をノイズとして除外
       if (/^\d{3,7}\s+\d+$/.test(l.trim())) return null; // 分割された商品番号（例: 93392 10）をノイズとして除外
       return l.replace(SHELF_RE, '').trim();
@@ -1172,12 +1173,19 @@
     // 金額行を起点に、上方向へ最大3行遡って商品名を取得する
     const items   = [];
     const usedIdx = new Set(); // 商品名として使用済みの行インデックス
+    let pendingCpnDiscount = 0; // CPNブロック割引の繰越（次の商品登録時に適用）
 
     function addItem(name, price) {
       const c = cleanName(name);
       if (!c || !isValidName(c)) return false;
       if (totalAmount > 0 && price === totalAmount) return false; // ■ 6. 合計行除外
-      items.push({ name: c, price });
+      let finalPrice = price;
+      if (pendingCpnDiscount < 0) {
+        finalPrice = price + pendingCpnDiscount;
+        pendingCpnDiscount = 0;
+        if (finalPrice <= 0) return false;
+      }
+      items.push({ name: c, price: finalPrice });
       return true;
     }
 
@@ -1222,6 +1230,19 @@
       // ■ 5. 割引処理（マイナス金額行）
       const negAmt = extractNegAmt(line);
       if (negAmt !== null) {
+        // CPNコンテキスト検出：直上の非null/非空行がCPN/IRC/COUPON → 次の商品に繰越
+        let isCPNContext = false;
+        for (let k = i - 1; k >= 0; k--) {
+          if (lines[k] === null) continue;
+          if (lines[k] === '') continue;
+          if (/CPN|IRC|COUPON/.test(lines[k])) isCPNContext = true;
+          break;
+        }
+        if (isCPNContext) {
+          pendingCpnDiscount += negAmt;
+          usedIdx.add(i);
+          continue;
+        }
         // 当該行または直前の非空行にFORBIDDENワードがあれば割引をスキップ
         // ただしCPN/IRC/COUPONはクーポン識別語なので割引を許可する
         let labelForbidden = FORBIDDEN.test(line);
