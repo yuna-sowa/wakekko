@@ -1230,14 +1230,20 @@
       // ■ 5. 割引処理（マイナス金額行）
       const negAmt = extractNegAmt(line);
       if (negAmt !== null) {
-        // CPNコンテキスト検出：直上の非null/非空行がCPN/IRC/COUPON → 次の商品に繰越
+        // CPNコンテキスト検出
+        // CPN行より上を遡り、価格行が先に見つかれば後付け割引（直前商品に即時適用）
+        // 価格行より先にCPN行が見つかれば事前割引（次の商品に繰越）
         let isCPNContext = false;
+        let foundCPN = false;
+        let foundAboveCPN = false;
         for (let k = i - 1; k >= 0; k--) {
           if (lines[k] === null) continue;
           if (lines[k] === '') continue;
-          if (/CPN|IRC|COUPON/.test(lines[k])) isCPNContext = true;
+          if (/CPN|IRC|COUPON/.test(lines[k])) { foundCPN = true; continue; }
+          if (foundCPN) { isCPNContext = !isPriceLine(lines[k]); foundAboveCPN = true; }
           break;
         }
+        if (foundCPN && !foundAboveCPN) isCPNContext = true; // CPN上に行なし → 事前割引
         if (isCPNContext) {
           pendingCpnDiscount += negAmt;
           usedIdx.add(i);
