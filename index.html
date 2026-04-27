@@ -1240,8 +1240,9 @@
           if (lines[k] === null) continue;
           if (lines[k] === '') continue;
           if (/CPN|IRC|COUPON/.test(lines[k])) { foundCPN = true; continue; }
-          if (foundCPN) { isCPNContext = !isPriceLine(lines[k]); foundAboveCPN = true; }
-          break;
+          if (foundCPN) { isCPNContext = !isPriceLine(lines[k]); foundAboveCPN = true; break; }
+          if (isPriceLine(lines[k])) break; // 価格行に到達 → CPNなし確定
+          // 非価格行（クーポン名など）はスキップして上へ継続
         }
         if (foundCPN && !foundAboveCPN) isCPNContext = true; // CPN上に行なし → 事前割引
         if (isCPNContext) {
