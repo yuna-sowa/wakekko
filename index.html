@@ -1053,6 +1053,7 @@
       if (/^\d{3,4}$/.test(l.trim())) return null; // 3-4桁単独数字行（CPNクーポン番号・割引額の表示行等）をノイズとして除外
       if (/^\d{5,7}$/.test(l.trim())) return null; // 5-7桁単独数字行（コストコ商品番号等）をノイズとして除外
       if (/^\d{3,7}\s+\d+$/.test(l.trim())) return null; // 分割された商品番号（例: 93392 10）をノイズとして除外
+      if (/御買上げ点数/.test(l)) return null; // レシート合計行（「御買上げ点数:7」等）をノイズとして除外
       return l.replace(SHELF_RE, '').trim();
     });
 
@@ -1240,11 +1241,13 @@
           if (lines[k] === null) continue;
           if (lines[k] === '') continue;
           if (/CPN|IRC|COUPON/.test(lines[k])) { foundCPN = true; continue; }
-          if (foundCPN) { isCPNContext = !isPriceLine(lines[k]); foundAboveCPN = true; break; }
-          if (isPriceLine(lines[k])) break; // 価格行に到達 → CPNなし確定
-          // 非価格行（クーポン名など）はスキップして上へ継続
+          if (isPriceLine(lines[k])) {
+            if (foundCPN) { isCPNContext = false; foundAboveCPN = true; }
+            break; // 価格行到達 → 確定（CPN有→後付け割引、CPN無→非CPNコンテキスト）
+          }
+          // 非価格行（クーポン名・CPN上の名前行・ノイズ等）はスキップして上へ継続
         }
-        if (foundCPN && !foundAboveCPN) isCPNContext = true; // CPN上に行なし → 事前割引
+        if (foundCPN && !foundAboveCPN) isCPNContext = true; // CPN上に価格行なし → 事前割引
         if (isCPNContext) {
           pendingCpnDiscount += negAmt;
           usedIdx.add(i);
