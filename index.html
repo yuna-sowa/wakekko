@@ -1199,8 +1199,9 @@
         const l = lines[j];
         if (l === null) continue; // ノイズ行（カウントしない）
         if (usedIdx.has(j)) {
-          if (isPriceLine(l)) continue; // 使用済み価格行はスキップして探索継続
-          else break;                   // 使用済み名前行で探索終了
+          if (isPriceLine(l)) continue;          // 使用済み価格行はスキップして探索継続
+          if (extractNegAmt(l) !== null) continue; // 使用済み割引行もスキップ（割引ブロックをまたいだ名前探索を許可）
+          else break;                            // 使用済み名前行で探索終了
         }
         checked++;
         if (!l) continue; // 空行はスキップ
@@ -1336,8 +1337,16 @@
           if (next === null || next === '') continue;
           if (!isPriceLine(next) || DATE_PAT.test(next) || TIME_PAT.test(next)) break;
           const np = getPrefix(next);
-          if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) following++;
-          else break;
+          if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) {
+            // T/E付きかつ金額が異なる行のみ別商品としてカウント
+            // T/Eなし行=OCR分割行、同一金額T/E行=同商品の補完行 はカウントせず
+            const nextAmt = extractAmt(next);
+            if (/[TE]\s*$/.test(next) && nextAmt !== null) {
+              if (nextAmt !== price) following++;
+              else break; // 同一金額T/E行 → 同商品の補完行 → ここで打ち切り
+            }
+            // T/Eなし行は継続（次のT/E行を探す）
+          } else break;
         }
         const name = findNameAbove(i - 1, following);
         if (name) addItem(name, price);
