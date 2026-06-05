@@ -41,17 +41,12 @@
       letter-spacing: 2px;
     }
 
-    /* ========== 2カラム ========== */
+    /* ========== レイアウト ========== */
     .layout {
-      display: flex;
-      gap: 32px;
-      max-width: 1040px;
+      max-width: 540px;
       margin: 0 auto;
       padding: 36px 32px;
-      align-items: flex-start;
     }
-    .col-left  { flex: 1; min-width: 0; }
-    .col-right { flex: 1; min-width: 0; position: sticky; top: 36px; }
 
     /* ========== カード共通 ========== */
     .card {
@@ -508,13 +503,10 @@
     }
 
     /* ========== レスポンシブ ========== */
-    @media (max-width: 720px) {
+    @media (max-width: 480px) {
       .layout {
-        flex-direction: column;
         padding: 24px 18px;
-        gap: 24px;
       }
-      .col-right { position: static; }
       .total-box { min-width: 72px; padding: 18px 10px; }
       .total-yen { font-size: 22px; }
       .form-grid { gap: 8px; }
