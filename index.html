@@ -1177,18 +1177,17 @@ ${text}`;
     if (item.quantity > 1) {
       const assigned = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0);
       const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
-      if (totalAssigned === 0) { shares.me = item.price; return shares; }
+      if (totalAssigned === 0) return shares; // 未割り当て → 全員0（表では「-」表示）
+      // 個数に比例した金額を配分
       assigned.forEach(m => {
-        shares[m.key] = Math.floor(item.price * item.qty[m.key] / totalAssigned);
+        shares[m.key] = Math.round(item.price * item.qty[m.key] / item.quantity);
       });
-      // 未割当分（1円単位端数）を先頭のメンバーから配分
-      const unassignedQty = item.quantity - totalAssigned;
-      if (unassignedQty > 0) {
-        const unassignedPrice = Math.round(item.price * unassignedQty / item.quantity);
-        shares.me = (shares.me || 0) + unassignedPrice;
+      // 全量割り当て済みの場合のみ端数補正（合計がitem.priceと一致するよう）
+      if (totalAssigned === item.quantity) {
+        const sum = assigned.reduce((s, m) => s + shares[m.key], 0);
+        let rem = item.price - sum;
+        for (const m of assigned) { if (rem <= 0) break; shares[m.key]++; rem--; }
       }
-      let rem = item.price - MEMBERS.reduce((s, m) => s + shares[m.key], 0);
-      for (const m of assigned) { if (rem <= 0) break; shares[m.key]++; rem--; }
       return shares;
     }
 
@@ -1349,7 +1348,11 @@ ${text}`;
         + `</tr>`;
     }).join('');
 
-    const totals = receiptTotal > 0
+    // qty≥2で未割り当て商品があるときはレシート合計按分を使わない（差額が歪むため）
+    const hasUnassignedQty = items.some(it =>
+      it.quantity > 1 && MEMBERS.reduce((s, m) => s + (it.qty?.[m.key] || 0), 0) < it.quantity
+    );
+    const totals = receiptTotal > 0 && !hasUnassignedQty
       ? calcSplitByReceipt(items, receiptTotal)
       : rawTotals;
 
