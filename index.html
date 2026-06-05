@@ -273,10 +273,18 @@
       flex-shrink: 0;
     }
     .qty-btn:hover { background: #FFE0E0; }
+    .qty-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
     .qty-num { font-size: 18px; font-weight: 700; color: #333; min-width: 24px; text-align: center; }
     .qty-unit-hint { font-size: 11px; font-weight: 400; color: #aaa; }
-    .qty-total-hint { font-size: 11px; color: #bbb; margin-top: 6px; text-align: right; }
-    .qty-total-hint.complete { color: #5CBF8A; font-weight: 700; }
+    .qty-remaining {
+      font-size: 12px;
+      font-weight: 700;
+      text-align: right;
+      margin-bottom: 6px;
+      color: #E8707A;
+    }
+    .qty-remaining.complete { color: #5CBF8A; }
+    .qty-total-hint { font-size: 11px; color: #ddd; margin-top: 4px; text-align: right; }
 
     .empty-msg {
       text-align: center;
@@ -1151,7 +1159,10 @@ ${text}`;
   function setQty(itemId, key, val) {
     const item = items.find(x => x.id === itemId);
     if (!item) return;
-    item.qty[key] = Math.max(0, Math.min(val, item.quantity));
+    const currentTotal = MEMBERS.reduce((s, m) => s + (item.qty[m.key] || 0), 0);
+    const delta = val - (item.qty[key] || 0);
+    if (delta > 0 && currentTotal + delta > item.quantity) return;
+    item.qty[key] = Math.max(0, val);
     render();
   }
 
@@ -1268,21 +1279,27 @@ ${text}`;
       if (item.quantity > 1) {
         // 個数割り当てモード
         const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
-        const complete = totalAssigned === item.quantity;
+        const remaining = item.quantity - totalAssigned;
+        const complete  = remaining === 0;
         const qtyRows = MEMBERS.map(m => {
           const v = item.qty?.[m.key] || 0;
+          const minusDis = v <= 0        ? 'disabled' : '';
+          const plusDis  = remaining <= 0 ? 'disabled' : '';
           return `<div class="qty-row">`
             + `<span class="qty-label ${m.cl}">${esc(m.label)}</span>`
             + `<div class="qty-ctrl">`
-            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v - 1})">−</button>`
+            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v - 1})" ${minusDis}>−</button>`
             +   `<span class="qty-num">${v}</span>`
-            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v + 1})">＋</button>`
+            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v + 1})" ${plusDis}>＋</button>`
             + `</div>`
             + `</div>`;
         }).join('');
-        controls = `<div class="qty-checks">${qtyRows}</div>`
-          + `<div class="qty-total-hint${complete ? ' complete' : ''}">`
-          + `合計 ${totalAssigned} / ${item.quantity}個${complete ? ' ✓' : ''}</div>`;
+        const remainingLabel = complete
+          ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
+          : `<div class="qty-remaining">残り ${remaining}個</div>`;
+        controls = remainingLabel
+          + `<div class="qty-checks">${qtyRows}</div>`
+          + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`;
         priceBadge = `¥${item.price.toLocaleString()} `
           + `<span class="qty-unit-hint">(¥${item.unitPrice.toLocaleString()}×${item.quantity})</span>`;
       } else {
