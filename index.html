@@ -239,6 +239,45 @@
     }
     .split-note b { color: #E8707A; }
 
+    /* ========== 個数割り当てコントロール ========== */
+    .qty-checks { display: flex; flex-direction: column; gap: 8px; }
+    .qty-row { display: flex; align-items: center; justify-content: space-between; }
+    .qty-label {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1.5px solid #F0D8D8;
+      color: #bbb;
+      min-width: 60px;
+      text-align: center;
+    }
+    .qty-label.cl-me { border-color: #F0A0A8; background: #FFF0F0; color: #C85060; }
+    .qty-label.cl-a  { border-color: #90C8B8; background: #F0FAF6; color: #408070; }
+    .qty-label.cl-b  { border-color: #C0B0D8; background: #F5F0FA; color: #685088; }
+    .qty-label.cl-c  { border-color: #E8C098; background: #FFF8F0; color: #A87030; }
+    .qty-ctrl { display: flex; align-items: center; gap: 12px; }
+    .qty-btn {
+      background: #FFF5F5;
+      border: 1.5px solid #F0D8D8;
+      color: #E8707A;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+    .qty-btn:hover { background: #FFE0E0; }
+    .qty-num { font-size: 18px; font-weight: 700; color: #333; min-width: 24px; text-align: center; }
+    .qty-unit-hint { font-size: 11px; font-weight: 400; color: #aaa; }
+    .qty-total-hint { font-size: 11px; color: #bbb; margin-top: 6px; text-align: right; }
+    .qty-total-hint.complete { color: #5CBF8A; font-weight: 700; }
+
     .empty-msg {
       text-align: center;
       color: #ccc;
@@ -952,12 +991,13 @@
           currentParsedResult.totalAmount ? `<div class="ocr-parsed-item ocr-meta"><span>合計</span><span>¥${currentParsedResult.totalAmount.toLocaleString()}</span></div>` : '',
         ].join('');
         ocrParsed.innerHTML = metaRows + currentParsedResult.items
-          .map(it =>
-            `<div class="ocr-parsed-item">`
-            + `<span>${esc(it.name)}</span>`
-            + `<span>¥${it.price.toLocaleString()}</span>`
-            + `</div>`
-          )
+          .map(it => {
+            const qtyBadge = it.quantity > 1 ? ` <small>×${it.quantity}</small>` : '';
+            return `<div class="ocr-parsed-item">`
+              + `<span>${esc(it.name)}${qtyBadge}</span>`
+              + `<span>¥${it.price.toLocaleString()}</span>`
+              + `</div>`;
+          })
           .join('');
         btnGoMain.textContent   = '割り勘リストに追加して進む →';
         btnGoMain.style.display = 'block';
@@ -969,7 +1009,14 @@
           currentParsedResult.items.forEach(it => {
             const checked = {};
             MEMBERS.forEach(m => (checked[m.key] = false));
-            items.push({ id: Date.now() + (Math.random() * 1000 | 0), name: it.name, price: it.price, checked });
+            const qty = {};
+            MEMBERS.forEach(m => (qty[m.key] = 0));
+            items.push({
+              id: Date.now() + (Math.random() * 1000 | 0),
+              name: it.name, price: it.price,
+              quantity: it.quantity || 1, unitPrice: it.unitPrice || null,
+              checked, qty,
+            });
           });
           render();
           showScreen('screen-main');
@@ -1018,8 +1065,13 @@
   おむつ           ← 商品名
   ¥298×2  596内   ← 単価×数量。商品名=おむつ、金額=596
 
+## 個数がある商品の読み方
+- 「ランチプレート ¥1,500×3 4,500内」のように単価・個数・合計がある場合は quantity と unitPrice も返す
+- quantity: 個数（整数）、unitPrice: 単価（整数）、price: 合計金額（unitPrice × quantity）
+- 個数が1または不明な場合は quantity と unitPrice は省略する
+
 ## 返答形式（JSONのみ、余分なテキストなし）
-{"storeName":"","totalAmount":0,"items":[{"name":"","price":0}]}
+{"storeName":"","totalAmount":0,"items":[{"name":"","price":0,"quantity":3,"unitPrice":1500}]}
 
 OCRテキスト:
 ${text}`;
@@ -1055,7 +1107,16 @@ ${text}`;
       storeName:   String(parsed.storeName  ?? '').trim(),
       totalAmount: Number(parsed.totalAmount) || 0,
       items: (parsed.items ?? [])
-        .map(it => ({ name: String(it.name ?? '').trim(), price: Number(it.price) || 0 }))
+        .map(it => {
+          const quantity = Number(it.quantity) || 1;
+          const unitPrice = quantity > 1 ? (Number(it.unitPrice) || Math.round(Number(it.price) / quantity)) : null;
+          return {
+            name:      String(it.name ?? '').trim(),
+            price:     Number(it.price) || 0,
+            quantity:  quantity > 1 ? quantity : 1,
+            unitPrice: quantity > 1 ? unitPrice : null,
+          };
+        })
         .filter(it => it.name && it.price > 0),
     };
   }
@@ -1087,12 +1148,39 @@ ${text}`;
     if (item) { item.checked[key] = !item.checked[key]; render(); }
   }
 
+  function setQty(itemId, key, val) {
+    const item = items.find(x => x.id === itemId);
+    if (!item) return;
+    item.qty[key] = Math.max(0, Math.min(val, item.quantity));
+    render();
+  }
+
   // 各メンバーの負担額を計算する。
-  // 1円未満の端数は先頭のメンバーから順に1円ずつ上乗せして完全に分配する。
-  // チェックなしの場合は「自分」に全額を加算する。
+  // 個数割り当てモード（quantity > 1）: 割り当て個数×単価で按分、端数は先頭から1円加算。
+  // チェックモード: 1円未満の端数は先頭のメンバーから順に1円ずつ上乗せして完全に分配する。
+  // チェックなし／個数未割り当ての場合は「自分」に全額を加算する。
   function calcShares(item) {
     const shares = {};
     MEMBERS.forEach(m => (shares[m.key] = 0));
+
+    if (item.quantity > 1) {
+      const assigned = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0);
+      const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
+      if (totalAssigned === 0) { shares.me = item.price; return shares; }
+      assigned.forEach(m => {
+        shares[m.key] = Math.floor(item.price * item.qty[m.key] / totalAssigned);
+      });
+      // 未割当分（1円単位端数）を先頭のメンバーから配分
+      const unassignedQty = item.quantity - totalAssigned;
+      if (unassignedQty > 0) {
+        const unassignedPrice = Math.round(item.price * unassignedQty / item.quantity);
+        shares.me = (shares.me || 0) + unassignedPrice;
+      }
+      let rem = item.price - MEMBERS.reduce((s, m) => s + shares[m.key], 0);
+      for (const m of assigned) { if (rem <= 0) break; shares[m.key]++; rem--; }
+      return shares;
+    }
+
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) { shares.me = item.price; return shares; }
     const base = Math.floor(item.price / sel.length);
@@ -1154,6 +1242,14 @@ ${text}`;
 
   // 商品カードに表示する割り勘ヒント文を返す
   function hint(item) {
+    if (item.quantity > 1) {
+      const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
+      const parts = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0)
+        .map(m => `${m.label}×${item.qty[m.key]}`).join(' ＋ ');
+      const unassigned = item.quantity - totalAssigned;
+      const suffix = unassigned > 0 ? `　自分に残り${unassigned}個` : '　<b>✓ 割り当て完了</b>';
+      return (parts || '未割り当て') + suffix;
+    }
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) return '<b>自分に全額加算</b>';
     return `${sel.map(m => m.label).join(' + ')} で <b>${sel.length}人割り</b>`;
@@ -1167,24 +1263,51 @@ ${text}`;
     }
 
     $('itemList').innerHTML = items.map(item => {
-      const pills = MEMBERS.map(m => {
-        const uid = `c_${item.id}_${m.key}`;
-        const chk = item.checked[m.key] ? 'checked' : '';
-        return `<span class="pill">`
-          + `<input type="checkbox" id="${uid}" ${chk} onchange="toggle(${item.id},'${m.key}')">`
-          + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
-          + `</span>`;
-      }).join('');
+      let controls, priceBadge;
+
+      if (item.quantity > 1) {
+        // 個数割り当てモード
+        const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
+        const complete = totalAssigned === item.quantity;
+        const qtyRows = MEMBERS.map(m => {
+          const v = item.qty?.[m.key] || 0;
+          return `<div class="qty-row">`
+            + `<span class="qty-label ${m.cl}">${esc(m.label)}</span>`
+            + `<div class="qty-ctrl">`
+            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v - 1})">−</button>`
+            +   `<span class="qty-num">${v}</span>`
+            +   `<button class="qty-btn" onclick="setQty(${item.id},'${m.key}',${v + 1})">＋</button>`
+            + `</div>`
+            + `</div>`;
+        }).join('');
+        controls = `<div class="qty-checks">${qtyRows}</div>`
+          + `<div class="qty-total-hint${complete ? ' complete' : ''}">`
+          + `合計 ${totalAssigned} / ${item.quantity}個${complete ? ' ✓' : ''}</div>`;
+        priceBadge = `¥${item.price.toLocaleString()} `
+          + `<span class="qty-unit-hint">(¥${item.unitPrice.toLocaleString()}×${item.quantity})</span>`;
+      } else {
+        // チェックボックスモード
+        const pills = MEMBERS.map(m => {
+          const uid = `c_${item.id}_${m.key}`;
+          const chk = item.checked[m.key] ? 'checked' : '';
+          return `<span class="pill">`
+            + `<input type="checkbox" id="${uid}" ${chk} onchange="toggle(${item.id},'${m.key}')">`
+            + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
+            + `</span>`;
+        }).join('');
+        controls = `<div class="checks">${pills}</div>`;
+        priceBadge = `¥${item.price.toLocaleString()}`;
+      }
 
       return `<div class="item-card">`
         + `<div class="item-top">`
         +   `<div>`
         +     `<div class="item-name">${esc(item.name)}</div>`
-        +     `<span class="item-price-badge">¥${item.price.toLocaleString()}</span>`
+        +     `<span class="item-price-badge">${priceBadge}</span>`
         +   `</div>`
         +   `<button class="btn-del" onclick="deleteItem(${item.id})" title="削除">&times;</button>`
         + `</div>`
-        + `<div class="checks">${pills}</div>`
+        + controls
         + `<div class="split-note">${hint(item)}</div>`
         + `</div>`;
     }).join('');
