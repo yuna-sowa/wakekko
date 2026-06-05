@@ -135,14 +135,37 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    .item-card {
+      cursor: pointer;
+      user-select: none;
+    }
     .item-top {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
       gap: 10px;
-      margin-bottom: 12px;
     }
-    .item-top > div { min-width: 0; flex: 1; }
+    .item-card.open .item-top {
+      margin-bottom: 14px;
+    }
+    .item-top > div:first-child { min-width: 0; flex: 1; }
+    .item-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .expand-chevron {
+      font-size: 10px;
+      color: #ccc;
+      line-height: 1;
+    }
+    .split-note-compact {
+      font-size: 11px;
+      color: #bbb;
+      margin-top: 6px;
+    }
+    .split-note-compact b { color: #E8707A; }
     .item-name {
       font-size: 14px;
       font-weight: 700;
@@ -1217,9 +1240,16 @@ ${text}`;
 
   // ── インライン編集 ───────────────────────────────────────────
   let editingState = null; // { id, field: 'name' | 'price' }
+  let openItemId   = null; // 展開中の商品カード id
+
+  window.toggleItem = function(id) {
+    openItemId = (openItemId === id) ? null : id;
+    render();
+  };
 
   function startEdit(id, field) {
-    editingState = { id, field };
+    openItemId    = id; // カードを展開してから編集
+    editingState  = { id, field };
     render();
   }
 
@@ -1425,30 +1455,38 @@ ${text}`;
         priceBadge = `¥${item.price.toLocaleString()}`;
       }
 
+      const isOpen = item.id === openItemId;
+
       // 商品名 HTML（レシート商品はタップで編集可）
       const nameHtml = isEditName
         ? `<input class="edit-input edit-input-focus" type="text" value="${esc(item.name)}"
+             onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'name',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'name',this.value)">`
-        : `<div class="item-name${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</div>`;
+        : `<div class="item-name${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</div>`;
 
       // 価格バッジ HTML（レシート商品はタップで編集可）
       const badgeHtml = isEditPrice
         ? `<span class="item-price-badge"><input class="edit-input edit-price-input edit-input-focus" type="number" value="${item.price}" min="1"
+             onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'price',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'price',this.value)"></span>`
-        : `<span class="item-price-badge${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="startEdit(${item.id},'price')"` : ''}>${priceBadge}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</span>`;
+        : `<span class="item-price-badge${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'price')"` : ''}>${priceBadge}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</span>`;
 
-      return `<div class="item-card">`
+      return `<div class="item-card${isOpen ? ' open' : ''}" onclick="toggleItem(${item.id})">`
         + `<div class="item-top">`
         +   `<div>`
         +     nameHtml
         +     badgeHtml
         +   `</div>`
-        +   `<button class="btn-del" onclick="deleteItem(${item.id})" title="削除">&times;</button>`
+        +   `<div class="item-top-actions">`
+        +     `<span class="expand-chevron">${isOpen ? '▲' : '▼'}</span>`
+        +     `<button class="btn-del" onclick="event.stopPropagation();deleteItem(${item.id})" title="削除">&times;</button>`
+        +   `</div>`
         + `</div>`
-        + controls
-        + `<div class="split-note">${hint(item)}</div>`
+        + (isOpen
+            ? `<div class="item-controls" onclick="event.stopPropagation()">${controls}<div class="split-note">${hint(item)}</div></div>`
+            : `<div class="split-note-compact">${hint(item)}</div>`)
         + `</div>`;
     }).join('');
 
