@@ -384,6 +384,20 @@
     .detail-table tbody tr:active { background: #FFF5F5; }
     .detail-table .val  { color: #333333; font-weight: 700; font-size: 14px; }
     .detail-table .zero { color: #ddd; }
+    .detail-table .adj-row td { border-top: 1px dashed #F0D8D8; }
+    .detail-table .adj-row .cell-name { color: #bbb; font-size: 11px; line-height: 1.5; }
+    .detail-table .adj-row small { display: block; color: #bbb; }
+    .detail-table .adj-val { color: #bbb !important; font-weight: 500 !important; font-size: 12px !important; }
+    .split-warning {
+      background: #FFF5F0;
+      border: 1px solid #FFD0B0;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: #C06020;
+      margin-top: 12px;
+      line-height: 1.6;
+    }
 
     .detail-table tfoot td {
       padding: 14px 6px;
@@ -1023,7 +1037,7 @@
               id: Date.now() + (Math.random() * 1000 | 0),
               name: it.name, price: it.price,
               quantity: it.quantity || 1, unitPrice: it.unitPrice || null,
-              checked, qty,
+              checked, qty, fromReceipt: true,
             });
           });
           render();
@@ -1138,7 +1152,7 @@ ${text}`;
 
     const checked = {};
     MEMBERS.forEach(m => (checked[m.key] = false));
-    items.push({ id: Date.now(), name, price, checked });
+    items.push({ id: Date.now(), name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false });
 
     $('itemName').value  = '';
     $('itemPrice').value = '';
@@ -1201,53 +1215,65 @@ ${text}`;
 
   /**
    * レシート合計に基づく割り勘計算。
+   * レシート商品のみで差額を計算し、手動商品は別途加算する。
    *
-   * 商品按分の合計とレシート合計の差額（税・値引き端数など）を
-   * 各人の購入金額比率で按分し、四捨五入の端数は支払者に集約する。
-   * 最終的に全員の合計がレシート合計と完全一致することを保証する。
+   * ケース2（差額正）: 差額を購入比率で自動按分 → adjRow を返す
+   * ケース3（差額負・5%未満）: 同上（マイナス按分）
+   * ケース3（差額負・5%以上）: 調整せず警告を返す
    *
-   * @param {Array}  itemList     - items 配列（price + checked を持つオブジェクト）
-   * @param {number} receiptTotal - レシート合計金額
-   * @param {string} [payer]      - 端数調整を受けるメンバーキー（default: 'me'）
-   * @returns {Object}            - メンバーキーごとの最終負担額 { me, a, b, c }
+   * @returns {{ finals, adjRow, warning }}
    */
   function calcSplitByReceipt(itemList, receiptTotal, payer = 'me') {
-    const keys = MEMBERS.map(m => m.key);
+    const keys         = MEMBERS.map(m => m.key);
+    const receiptItems = itemList.filter(it => it.fromReceipt);
+    const manualItems  = itemList.filter(it => !it.fromReceipt);
 
-    // 1. 各人の商品合計（既存の calcShares を再利用）
-    const raw = {};
-    keys.forEach(k => (raw[k] = 0));
-    for (const item of itemList) {
+    // レシート商品の各人合計
+    const receiptRaw = {};
+    keys.forEach(k => (receiptRaw[k] = 0));
+    for (const item of receiptItems) {
       const sh = calcShares(item);
-      keys.forEach(k => (raw[k] += sh[k]));
+      keys.forEach(k => (receiptRaw[k] += sh[k]));
     }
 
-    // 2. 差額算出（税・端数・値引きなどによるズレ）
-    const itemsTotal = keys.reduce((s, k) => s + raw[k], 0);
-    const diff = receiptTotal - itemsTotal;
+    // 手動商品の各人合計
+    const manualRaw = {};
+    keys.forEach(k => (manualRaw[k] = 0));
+    for (const item of manualItems) {
+      const sh = calcShares(item);
+      keys.forEach(k => (manualRaw[k] += sh[k]));
+    }
 
-    if (diff === 0) return { ...raw };
+    // 差額計算（レシート商品のみ）
+    const receiptItemsTotal = keys.reduce((s, k) => s + receiptRaw[k], 0);
+    const diff = receiptTotal - receiptItemsTotal;
 
-    // 3. 差額を購入金額比率で按分 → 四捨五入
     const adj = {};
-    if (itemsTotal > 0) {
-      keys.forEach(k => {
-        adj[k] = Math.round((raw[k] / itemsTotal) * diff);
-      });
-    } else {
-      // 全員0円（商品なし）→ 支払者が全額負担
-      keys.forEach(k => (adj[k] = 0));
-      adj[payer] = diff;
+    keys.forEach(k => (adj[k] = 0));
+    let adjRow = null, warning = null;
+
+    if (diff !== 0) {
+      const diffRate = Math.abs(diff) / receiptTotal;
+      if (diff > 0 || diffRate < 0.05) {
+        // 自動按分（購入比率で分配）
+        if (receiptItemsTotal > 0) {
+          keys.forEach(k => { adj[k] = Math.round((receiptRaw[k] / receiptItemsTotal) * diff); });
+        } else {
+          adj[payer] = diff;
+        }
+        // 端数補正
+        const adjSum = keys.reduce((s, k) => s + adj[k], 0);
+        adj[payer] += diff - adjSum;
+        adjRow = { adj: { ...adj }, total: diff };
+      } else {
+        // 5%以上のマイナス差額 → 警告、調整なし
+        warning = { diff, rate: Math.round(diffRate * 100) };
+      }
     }
 
-    // 4. 四捨五入による端数ズレを支払者に加減
-    const adjSum = keys.reduce((s, k) => s + adj[k], 0);
-    adj[payer] += diff - adjSum;
-
-    // 5. 最終金額（全員合計 === receiptTotal を保証）
     const finals = {};
-    keys.forEach(k => (finals[k] = raw[k] + adj[k]));
-    return finals;
+    keys.forEach(k => (finals[k] = receiptRaw[k] + adj[k] + manualRaw[k]));
+    return { finals, adjRow, warning };
   }
 
   // 商品カードに表示する割り勘ヒント文を返す
@@ -1352,9 +1378,38 @@ ${text}`;
     const hasUnassignedQty = items.some(it =>
       it.quantity > 1 && MEMBERS.reduce((s, m) => s + (it.qty?.[m.key] || 0), 0) < it.quantity
     );
-    const totals = receiptTotal > 0 && !hasUnassignedQty
-      ? calcSplitByReceipt(items, receiptTotal)
-      : rawTotals;
+
+    let totals, adjRow = null, splitWarning = null;
+    if (receiptTotal > 0 && !hasUnassignedQty) {
+      const result = calcSplitByReceipt(items, receiptTotal);
+      totals       = result.finals;
+      adjRow       = result.adjRow;
+      splitWarning = result.warning;
+    } else {
+      totals = rawTotals;
+    }
+
+    // 調整額行（差額を自動按分した場合のみ表示）
+    let adjRowHtml = '';
+    if (adjRow) {
+      const sign     = adjRow.total > 0 ? '＋' : '−';
+      const absTotal = Math.abs(adjRow.total).toLocaleString();
+      const adjCells = MEMBERS.map(m => {
+        const v = adjRow.adj[m.key];
+        if (v === 0) return `<td class="zero">-</td>`;
+        return `<td class="val adj-val">${v > 0 ? '＋¥' : '−¥'}${Math.abs(v).toLocaleString()}</td>`;
+      }).join('');
+      adjRowHtml = `<tr class="adj-row">`
+        + `<td><span class="cell-name">調整額（税など）<small>${sign}¥${absTotal}</small></span></td>`
+        + adjCells + `</tr>`;
+    }
+
+    // 警告（5%以上のマイナス差額）
+    let warningHtml = '';
+    if (splitWarning) {
+      const absStr = Math.abs(splitWarning.diff).toLocaleString();
+      warningHtml = `<div class="split-warning">⚠️ 商品合計がレシート合計より¥${absStr}（${splitWarning.rate}%）多くなっています。商品の金額をご確認ください。</div>`;
+    }
 
     const boxes = MEMBERS.map(m =>
       `<div class="total-box ${m.box}">`
@@ -1370,9 +1425,10 @@ ${text}`;
       `<div class="totals-grid">${boxes}</div>`
       + `<table class="detail-table">`
       +   `<thead><tr><th>商品</th>${ths}</tr></thead>`
-      +   `<tbody>${rows}</tbody>`
+      +   `<tbody>${rows}${adjRowHtml}</tbody>`
       +   `<tfoot><tr><td>合計</td>${fts}</tr></tfoot>`
-      + `</table>`;
+      + `</table>`
+      + warningHtml;
   }
 
   // ── イベントリスナー ──────────────────────────────────────────
