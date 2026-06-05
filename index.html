@@ -239,6 +239,36 @@
     }
     .split-note b { color: #E8707A; }
 
+    /* ========== インライン編集 ========== */
+    .editable-field { cursor: pointer; }
+    .edit-icon {
+      font-size: 10px;
+      color: #ddd;
+      margin-left: 3px;
+      vertical-align: middle;
+      transition: color 0.15s;
+    }
+    .editable-field:hover .edit-icon,
+    .editable-field:active .edit-icon { color: #E8707A; }
+    .edit-input {
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      color: #333;
+      border: 1.5px solid #E8707A;
+      border-radius: 8px;
+      padding: 3px 8px;
+      outline: none;
+      background: #FFF8F8;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .edit-price-input {
+      width: 130px;
+      text-align: right;
+      font-size: 13px;
+    }
+
     /* ========== 個数割り当てコントロール ========== */
     .qty-checks { display: flex; flex-direction: column; gap: 8px; }
     .qty-row { display: flex; align-items: center; justify-content: space-between; }
@@ -1162,12 +1192,49 @@ ${text}`;
 
   function deleteItem(id) {
     const i = items.findIndex(x => x.id === id);
-    if (i !== -1) { items.splice(i, 1); render(); }
+    if (i === -1) return;
+    const item = items[i];
+    if (item.fromReceipt) receiptTotal = Math.max(0, receiptTotal - item.price);
+    items.splice(i, 1);
+    if (editingState?.id === id) editingState = null;
+    render();
   }
 
   function toggle(itemId, key) {
     const item = items.find(x => x.id === itemId);
     if (item) { item.checked[key] = !item.checked[key]; render(); }
+  }
+
+  // ── インライン編集 ───────────────────────────────────────────
+  let editingState = null; // { id, field: 'name' | 'price' }
+
+  function startEdit(id, field) {
+    editingState = { id, field };
+    render();
+  }
+
+  function saveEdit(id, field, value) {
+    if (!editingState) return; // blur が Enter 後に二重発火するのを防ぐ
+    const item = items.find(x => x.id === id);
+    if (item) {
+      if (field === 'name') {
+        const v = value.trim();
+        if (v) item.name = v;
+      } else if (field === 'price') {
+        const v = parseInt(String(value).replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(v) && v > 0) {
+          item.price = v;
+          if (item.quantity > 1) item.unitPrice = Math.round(v / item.quantity);
+        }
+      }
+    }
+    editingState = null;
+    render();
+  }
+
+  function cancelEdit() {
+    editingState = null;
+    render();
   }
 
   function setQty(itemId, key, val) {
@@ -1303,6 +1370,8 @@ ${text}`;
 
     $('itemList').innerHTML = items.map(item => {
       let controls, priceBadge;
+      const isEditName  = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'name';
+      const isEditPrice = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'price';
 
       if (item.quantity > 1) {
         // 個数割り当てモード
@@ -1346,11 +1415,25 @@ ${text}`;
         priceBadge = `¥${item.price.toLocaleString()}`;
       }
 
+      // 商品名 HTML（レシート商品はタップで編集可）
+      const nameHtml = isEditName
+        ? `<input class="edit-input edit-input-focus" type="text" value="${esc(item.name)}"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'name',this.value)}else if(event.key==='Escape'){cancelEdit()}"
+             onblur="saveEdit(${item.id},'name',this.value)">`
+        : `<div class="item-name${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</div>`;
+
+      // 価格バッジ HTML（レシート商品はタップで編集可）
+      const badgeHtml = isEditPrice
+        ? `<span class="item-price-badge"><input class="edit-input edit-price-input edit-input-focus" type="number" value="${item.price}" min="1"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'price',this.value)}else if(event.key==='Escape'){cancelEdit()}"
+             onblur="saveEdit(${item.id},'price',this.value)"></span>`
+        : `<span class="item-price-badge${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="startEdit(${item.id},'price')"` : ''}>${priceBadge}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</span>`;
+
       return `<div class="item-card">`
         + `<div class="item-top">`
         +   `<div>`
-        +     `<div class="item-name">${esc(item.name)}</div>`
-        +     `<span class="item-price-badge">${priceBadge}</span>`
+        +     nameHtml
+        +     badgeHtml
         +   `</div>`
         +   `<button class="btn-del" onclick="deleteItem(${item.id})" title="削除">&times;</button>`
         + `</div>`
@@ -1358,6 +1441,10 @@ ${text}`;
         + `<div class="split-note">${hint(item)}</div>`
         + `</div>`;
     }).join('');
+
+    // 編集モード中はinputにフォーカスを当てる
+    const focusEl = $('itemList').querySelector('.edit-input-focus');
+    if (focusEl) { focusEl.focus(); try { focusEl.select(); } catch(e) {} }
 
     const rawTotals = {};
     MEMBERS.forEach(m => (rawTotals[m.key] = 0));
