@@ -886,7 +886,7 @@
    *   1. URLSearchParams から APIキーを取得
    *   2. 画像を Base64 に変換
    *   3. Vision API に POST → fullTextAnnotation.text を取得
-   *   4. parseReceiptItems() でテキストから商品・金額を抽出
+   *   4. Claude API でテキストから商品・金額を抽出
    *   5. 結果を画面に表示し、割り勘リストへ追加するボタンを出す
    */
   async function analyzeReceipt(file) {
@@ -906,15 +906,16 @@
 
     try {
       // 1. URLパラメータから APIキーを取得
-      const apiKey = new URLSearchParams(window.location.search).get('APIkey');
-      if (!apiKey) {
-        throw new Error('APIキーが指定されていません。URLに ?APIkey=YOUR_KEY を追加してください。');
-      }
+      const apiKey    = new URLSearchParams(window.location.search).get('APIkey');
+      const claudeKey = new URLSearchParams(window.location.search).get('ClaudeKey');
+      if (!apiKey)    throw new Error('Google APIキーが指定されていません。URLに ?APIkey=YOUR_KEY を追加してください。');
+      if (!claudeKey) throw new Error('Claude APIキーが指定されていません。URLに &ClaudeKey=YOUR_KEY を追加してください。');
 
       // 2. 画像を Base64 に変換
       const base64Image = await fileToBase64(file);
 
       // 3. Vision API へ POST
+      ocrText.textContent = '① 文字を読み取り中…';
       const endpoint = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`;
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -941,8 +942,9 @@
       // 生テキストをそのまま表示（デバッグ・確認用）
       ocrText.textContent = text.trim() || '（テキストを検出できませんでした）';
 
-      // 5. 商品・金額・店名・合計をパースして一覧化
-      currentParsedResult = parseReceiptItems(text); // グローバルに保持
+      // 5. Claude AI で商品・金額・店名・合計を抽出
+      ocrParsed.innerHTML = '<div class="ocr-empty">② AIが商品リストを作成中…</div>';
+      currentParsedResult = await parseReceiptWithClaude(text, claudeKey); // グローバルに保持
 
       if (currentParsedResult.items.length > 0) {
         const metaRows = [
@@ -988,372 +990,74 @@
   }
 
   /**
-   * OCR テキストから店名・合計・商品一覧を抽出して返す。
-   * OCR崩れを前提とし、金額アンカー方式で商品を検出する。
-   *
+   * Claude AI に OCR テキストを渡して商品リストを返す。
    * @param {string} text - Vision API の fullTextAnnotation.text
-   * @returns {{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }}
+   * @param {string} claudeKey - Claude API キー
+   * @returns {Promise<{ storeName: string, totalAmount: number, items: {name:string, price:number}[] }>}
    */
-  function parseReceiptItems(text) {
-    // 全角数字・全角スペースを半角に統一、OCR誤認字を正規化
-    const allLines = text.split('\n').map(raw =>
-      raw
-        .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-        .replace(/　/g, ' ')
-        .replace(/稅/g, '税') // 中国語繁体字「稅」(U+7A05) を日本語「税」(U+7A0E) に統一
-        .trim()
-    );
+  async function parseReceiptWithClaude(text, claudeKey) {
+    const prompt = `あなたはレシート解析AIです。以下のレシートOCRテキストから商品情報を抽出し、JSONのみで返してください。説明文は不要です。
 
-    // ■ 1. 解析範囲の特定
-    // 終了ワードを含む行で解析を終了（ただし税合計・消費税・税額計はスルー）
-    const END_RE  = /合計|ご計|お買上|お買い上げ|総合計|今回計|SUBTOTAL|^TOTAL/;
-    const SKIP_RE = /税合計|消費税|税額計/;
-    let cutIdx = allLines.length, totalLineIdx = -1;
-    for (let i = 0; i < allLines.length; i++) {
-      const l = allLines[i];
-      if (!l || SKIP_RE.test(l)) continue;
-      if (END_RE.test(l)) { cutIdx = i; totalLineIdx = i; break; }
-    }
+## 抽出ルール
+- storeName: 店名（不明なら空文字）
+- totalAmount: 合計金額の数値（¥・カンマなし）
+- items: 商品リスト
+  - name: 商品名（記号・コード類を除いた読みやすい名前）
+  - price: 割引・クーポン適用後の正の整数
+- TEL・ポイント・消費税・日時などはitemsに含めない
+- 割引・クーポンは該当商品の価格に反映させ、itemsには含めない
 
-    // 合計金額抽出（終了行、または直後8行以内の単独金額行から取得）
-    // @単価行・マイナス行はスキップ。¥付きを優先し、¥なしは最初の値をフォールバックとして保持。
-    let totalAmount = 0;
-    if (totalLineIdx >= 0) {
-      const m = allLines[totalLineIdx].match(/[¥￥\\]?\s*(\d{1,3}[ ,.]\s*\d{3}|\d{1,6})\s*円?\s*$/);
-      if (m) totalAmount = parseInt(m[1].replace(/\D/g, ''), 10);
-      if (!totalAmount) {
-        let fallback = 0;
-        for (let j = totalLineIdx + 1; j < Math.min(totalLineIdx + 8, allLines.length); j++) {
-          if (!allLines[j]) continue;
-          if (SKIP_RE.test(allLines[j])) continue;
-          if (/^[-－△▲@]/.test(allLines[j])) continue; // 単価・割引行はスキップ
-          const hasYen = /[¥￥\\]/.test(allLines[j]);
-          const m2 = allLines[j].match(/[¥￥\\]?\s*(\d{1,3}[ ,.]\s*\d{3}|\d{1,6})\s*円?\s*$/);
-          if (m2) {
-            const v = parseInt(m2[1].replace(/\D/g, ''), 10);
-            if (hasYen) { totalAmount = v; break; } // ¥付きを確定値として採用
-            if (!fallback) fallback = v;            // 最初のプレーン数字をフォールバック
-          }
-        }
-        if (!totalAmount && fallback) totalAmount = fallback;
-      }
-    }
+## 金額の読み方
+- 金額の後に「内」「外」「税」が付いている場合（例: 1,078内）は、それを除いた数字が金額
+- 「¥」「￥」「\\」は通貨記号として無視し、数字部分だけを金額とする
 
-    // ■ 2. 前処理：行ノイズの除去
-    // 棚番号・分類番号（例：ソ#02、リ#05、#05）を行頭から除去
-    const SHELF_RE = /^[ァ-ヶA-Za-z]*#\d+\s*/;
-    const rawLines = allLines.slice(0, cutIdx);
-    // lines[i]: null=ノイズ行（( または _ で始まる）, ''=空行, 文字列=処理済み行
-    // ※ * で始まる行は商品名の可能性があるためノイズ扱いしない（例: *コアラパン）
-    const lines = rawLines.map(l => {
-      if (!l) return '';
-      if (/^[(_]/.test(l)) return null;
-      if (/^[Xx]{4,}/.test(l)) return null; // マスクカード番号（XXXXXXXXXXXX1234形式）
-      if (/^\d{1,2}$/.test(l.trim())) return null; // 1-2桁単独数字行（「1@」→「10」OCR誤認識など数量表記）をノイズとして除外
-      if (/^\d{3,4}$/.test(l.trim())) return null; // 3-4桁単独数字行（CPNクーポン番号・割引額の表示行等）をノイズとして除外
-      if (/^\d{5,7}$/.test(l.trim())) return null; // 5-7桁単独数字行（コストコ商品番号等）をノイズとして除外
-      if (/^\d{3,7}\s+\d+$/.test(l.trim())) return null; // 分割された商品番号（例: 93392 10）をノイズとして除外
-      if (/御買上げ点数/.test(l)) return null; // レシート合計行（「御買上げ点数:7」等）をノイズとして除外
-      return l.replace(SHELF_RE, '').trim();
+## 複数行にまたがる商品の読み方
+- 「単価×数量」「@単価 数量」のような行は商品名ではなく数量・単価の補足行
+- その場合、商品名はその直前の行、金額はその補足行に記載された合計金額を使う
+- 例：
+  おむつ           ← 商品名
+  ¥298×2  596内   ← 単価×数量。商品名=おむつ、金額=596
+
+## 返答形式（JSONのみ、余分なテキストなし）
+{"storeName":"","totalAmount":0,"items":[{"name":"","price":0}]}
+
+OCRテキスト:
+${text}`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': claudeKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }],
+      }),
     });
 
-    // ■ 3. 禁止ワード（これを含む行は商品として扱わない）
-    const FORBIDDEN = /TEL|番号|ポイント|クレジット|小計|合計|会計|税額|消費税|対象額|税込|軽減税率|外税|点|優待券|売上|VISA|Visa|通番|様|詳しくは|サービスカウンター|TAX|IRC|CPN|B\.O\.B|SUBTOTAL|会員|BIZ|COUPON/;
-
-    const DATE_PAT = /\d{4}[\/\-]\d{2}[\/\-]\d{2}|\d{4}年\d{1,2}月\d{1,2}日/;
-    const TIME_PAT = /\d{2}:\d{2}|\d{1,2}時\d{1,2}分/;
-    // 金額プレフィックス（¥・￥・\）
-    const YEN_RE = /[¥￥\\]/;
-
-    // ── ヘルパー関数 ─────────────────────────────────────────────
-
-    // 行末の正の金額を返す（8桁以上の連続数字は除外）
-    // ¥ ￥ \ * をプレフィックスとして許容、, . を桁区切りとして除去
-    // 例: *1.200 → 1200、¥1,200 → 1200
-    function extractAmt(line) {
-      if (!line) return null;
-      if (/\d{8,}/.test(line)) return null;
-      const m = line.match(/[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
-      if (!m) return null;
-      const v = parseInt(m[1].replace(/[,.]/g, ''), 10);
-      return v > 0 ? v : null;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err?.error?.message ?? `HTTP ${res.status}`;
+      throw new Error(`Claude API エラー: ${msg}`);
     }
 
-    // マイナス金額行か（-50 -100 ▲30 など）→ 負の値を返す
-    function extractNegAmt(line) {
-      if (!line) return null;
-      // 既存: 先頭にマイナス記号（-200、△200 など）
-      const m = line.match(/[△▲\-－]\s*[¥￥\\*]?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*$/);
-      if (m) return -parseInt(m[1].replace(/[,.]/g, ''), 10);
-      // コストコ形式: 末尾に「数字-」または「数字-[TE]」（例: 200-E、200-T、200-）
-      const m2 = line.match(/(\d{1,3}[,\.]\d{3}|\d{1,4})\s*-\s*[TE]?\s*$/);
-      if (!m2) return null;
-      return -parseInt(m2[1].replace(/[,.]/g, ''), 10);
-    }
+    const data    = await res.json();
+    const content = data?.content?.[0]?.text ?? '';
+    const match   = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('Claude APIの応答からJSONを取得できませんでした');
 
-    // 金額行か（行末が金額形式で終わる）
-    function isPriceLine(line) {
-      if (!line) return false;
-      if (/\d{8,}/.test(line)) return false;
-      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
-      if (!m) return false;
-      // 通貨記号・桁区切りなしで直前が非空白 → 商品名の一部（例: 旨味納豆3 の末尾3）
-      if (!m[1] && !/[,.]/.test(m[2])) {
-        const matchStart = line.length - m[0].length;
-        if (matchStart > 0 && !/\s/.test(line[matchStart - 1])) return false;
-      }
-      return true;
-    }
-
-    // A型検出：行末の金額を除いた「商品名プレフィックス」を返す（なければnull）
-    // ¥68 2個 のような単価+数量パターンも除去したうえで日本語・英字が残るか確認
-    function getPrefix(line) {
-      if (!line || FORBIDDEN.test(line)) return null;
-      const m = line.match(/([¥￥\\*])?\s*(\d{1,3}[,\.]\d{3}|\d{1,6})\s*円?\s*[TE]?\s*$/);
-      if (!m) return null;
-      // 通貨記号・桁区切りなしで直前が非空白 → 商品名の一部（例: 旨味納豆3 の末尾3）
-      if (!m[1] && !/[,.]/.test(m[2])) {
-        const matchStart = line.length - m[0].length;
-        if (matchStart > 0 && !/\s/.test(line[matchStart - 1])) return null;
-      }
-      const prefix = line.slice(0, line.length - m[0].length).trim();
-      // 数量ワード・単価記号を除いた核が商品名文字を含むか確認
-      const core = prefix
-        .replace(/[¥￥\\]?\s*\d[\d,]*\s*[個点本枚袋]/g, '')
-        .replace(/[¥￥\\]\s*\d[\d,]*/g, '')
-        .replace(/\d+\s*[個点本枚袋]/g, '')
-        .trim();
-      if (!/[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(core)) return null;
-      return prefix;
-    }
-
-    // 商品名として有効な行か
-    // 数量ワード・金額記号を除いた核に日本語・英字が残ることを確認
-    function isValidName(line) {
-      if (!line || FORBIDDEN.test(line)) return false;
-      if (/\d{8,}/.test(line) || DATE_PAT.test(line) || TIME_PAT.test(line)) return false;
-      if (/^\d+回$/.test(line.trim())) return false; // 支払回数（1回払いなど）
-      const core = line
-        .replace(/[¥￥\\]?\s*\d[\d,]*\s*[個点本枚袋]/g, '')
-        .replace(/[¥￥\\]\s*\d[\d,]*/g, '')
-        .replace(/\d+\s*[個点本枚袋]/g, '')
-        .trim();
-      return /[\u3040-\u30FF\u4E00-\u9FFF\uFF66-\uFF9FA-Za-z]/.test(core);
-    }
-
-    // 商品名クリーニング（記号・JANコード・単価+数量・末尾金額などを除去）
-    function cleanName(raw) {
-      let n = raw;
-      n = n.replace(/^[※＊*]\s*/, '');                         // 先頭 ※ * 除去
-      n = n.replace(/^\d+@\s*/, '');                           // コストコ数量表記（1@ 2@）除去
-      n = n.replace(/^\d{8,13}\s*/, '');                       // JANコード除去
-      n = n.replace(/^\d{3,7}[\s※]\s*/, '');                  // 短い番号コード除去
-      n = n.replace(/^\d+\s+/, '');                            // 先頭孤立数字除去
-      n = n.replace(/\s*[¥￥\\]\s*\d[\d,]*\s*\d*\s*[個点本枚袋].*$/g, '').trim(); // 単価+数量パターン除去
-      n = n.replace(/\s*\d+\s*[個点本枚袋]\s*$/g, '').trim(); // 末尾の数量除去
-      n = n.replace(/\s*[¥￥\\*]?\s*\d[\d,.]*\s*円?\s*$/g, '').trim(); // 末尾の金額除去
-      n = n.replace(/[※\\＼×÷☆★●○■□◇◆▶▷►◀◁▲▼△▽~～｜|]+/g, '');
-      n = n.replace(/\s{2,}/g, ' ').trim();
-      return n;
-    }
-
-    // ── 店名抽出（上から5行の非空行で条件を満たす最初の行）──────────
-    let storeName = '';
-    const nonEmpty = lines.filter(l => l && l.length > 0);
-    for (let i = 0; i < Math.min(5, nonEmpty.length); i++) {
-      const l = nonEmpty[i];
-      if (/合計|小計|TEL|tel/.test(l)) continue;
-      if (DATE_PAT.test(l) || TIME_PAT.test(l)) continue;
-      if (/^\d+$/.test(l)) continue;
-      if (isPriceLine(l) && !getPrefix(l)) continue;
-      storeName = l;
-      break;
-    }
-
-    // ■ 4. 商品抽出（金額アンカー方式）
-    // 金額行を起点に、上方向へ最大3行遡って商品名を取得する
-    const items   = [];
-    const usedIdx = new Set(); // 商品名として使用済みの行インデックス
-    let pendingCpnDiscount = 0; // CPNブロック割引の繰越（次の商品登録時に適用）
-
-    function addItem(name, price) {
-      const c = cleanName(name);
-      if (!c || !isValidName(c)) return false;
-      if (totalAmount > 0 && price === totalAmount) return false; // ■ 6. 合計行除外
-      let finalPrice = price;
-      if (pendingCpnDiscount < 0) {
-        finalPrice = price + pendingCpnDiscount;
-        pendingCpnDiscount = 0;
-        if (finalPrice <= 0) return false;
-      }
-      items.push({ name: c, price: finalPrice });
-      return true;
-    }
-
-    // 上方向探索：fromIdx から上に最大(skip+3)行（ノイズ行はカウント外）で商品名を探す
-    // skip: 有効な名前行を何件飛ばすか（連続金額ブロック対応）
-    function findNameAbove(fromIdx, skip = 0) {
-      let checked = 0;
-      let skipped = 0;
-      for (let j = fromIdx; j >= 0 && checked < skip + 3; j--) {
-        const l = lines[j];
-        if (l === null) continue; // ノイズ行（カウントしない）
-        if (usedIdx.has(j)) {
-          if (isPriceLine(l)) continue;          // 使用済み価格行はスキップして探索継続
-          if (extractNegAmt(l) !== null) continue; // 使用済み割引行もスキップ（割引ブロックをまたいだ名前探索を許可）
-          else break;                            // 使用済み名前行で探索終了
-        }
-        checked++;
-        if (!l) continue; // 空行はスキップ
-        if (!isPriceLine(l) && isValidName(l)) {
-          if (skipped < skip) { skipped++; continue; } // skip件は飛ばす
-          // 品質区分のみ（特・並・上・大・小・中など）の場合、直上の有効行と結合を試みる
-          let name = l;
-          if (/^[特並上下大小中極超高低優A-Za-z]{1,3}$/.test(cleanName(l).replace(/\s/g, ''))) {
-            for (let k = j - 1; k >= 0; k--) {
-              const above = lines[k];
-              if (above === null || above === '') continue;
-              if (usedIdx.has(k)) break;
-              if (isValidName(above)) { usedIdx.add(k); name = above + ' ' + l; }
-              break;
-            }
-          }
-          usedIdx.add(j);
-          return name;
-        }
-      }
-      return null;
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line === null || line === '') continue;
-
-      // ■ 5. 割引処理（マイナス金額行）
-      const negAmt = extractNegAmt(line);
-      if (negAmt !== null) {
-        // CPNコンテキスト検出
-        // CPN行より上を遡り、価格行が先に見つかれば後付け割引（直前商品に即時適用）
-        // 価格行より先にCPN行が見つかれば事前割引（次の商品に繰越）
-        let isCPNContext = false;
-        let foundCPN = false;
-        let foundAboveCPN = false;
-        for (let k = i - 1; k >= 0; k--) {
-          if (lines[k] === null) continue;
-          if (lines[k] === '') continue;
-          if (/CPN|IRC|COUPON/.test(lines[k])) { foundCPN = true; continue; }
-          if (isPriceLine(lines[k])) {
-            if (foundCPN) { isCPNContext = false; foundAboveCPN = true; }
-            break; // 価格行到達 → 確定（CPN有→後付け割引、CPN無→非CPNコンテキスト）
-          }
-          // 非価格行（クーポン名・CPN上の名前行・ノイズ等）はスキップして上へ継続
-        }
-        if (foundCPN && !foundAboveCPN) isCPNContext = true; // CPN上に価格行なし → 事前割引
-        if (isCPNContext) {
-          pendingCpnDiscount += negAmt;
-          usedIdx.add(i);
-          continue;
-        }
-        // 当該行または直前の非空行にFORBIDDENワードがあれば割引をスキップ
-        // ただしCPN/IRC/COUPONはクーポン識別語なので割引を許可する
-        let labelForbidden = FORBIDDEN.test(line);
-        if (labelForbidden && /CPN|IRC|COUPON/.test(line)) labelForbidden = false;
-        if (!labelForbidden) {
-          for (let k = i - 1; k >= 0; k--) {
-            if (lines[k] === null) continue;
-            if (lines[k] === '') continue;
-            if (/CPN|IRC|COUPON/.test(lines[k])) continue; // クーポン識別行はスキップして上を確認
-            labelForbidden = FORBIDDEN.test(lines[k]);
-            break;
-          }
-        }
-        if (!labelForbidden && items.length > 0) {
-          // 直前の商品に紐づけて金額を減算（0以下になれば商品ごと削除）
-          const last = items[items.length - 1];
-          const np = last.price + negAmt;
-          if (np > 0) { last.price = np; }
-          else items.pop();
-        }
-        // 割引行を使用済みとしてマーク（後続の金額行が割引行を商品名として拾わないよう）
-        usedIdx.add(i);
-        // 直前が商品でなければ会計割引（calcSplitByReceiptの差額按分で自動対応）
-        continue;
-      }
-
-      // 金額行でなければスキップ
-      if (!isPriceLine(line)) continue;
-
-      // 日付・時刻行はスキップ（例: 2024/03/12、10:30 が金額として誤抽出されるのを防ぐ）
-      if (DATE_PAT.test(line) || TIME_PAT.test(line)) continue;
-
-      // ■ NEW: @単価パターン（「商品名 @単価 数量 合計」形式）
-      // 例: キャラメルポップコーン @150 1 1点 150 → 商品名: キャラメルポップコーン, 金額: 150
-      const atIdx = line.search(/@\d/);
-      if (atIdx > 0) {
-        const price = extractAmt(line);
-        if (price !== null) {
-          const namePart = line.slice(0, atIdx).trim();
-          if (namePart) {
-            addItem(namePart, price);
-            usedIdx.add(i);
-            continue;
-          }
-        }
-      }
-
-      // A型：行内に商品名プレフィックスあり（「国産若鶏モモミンチ ¥347」など）
-      const prefix = getPrefix(line);
-      if (prefix) {
-        const QUALITY_RE = /^[特並上下大小中極超高低優A-Za-z]{1,3}$/;
-        if (QUALITY_RE.test(cleanName(prefix).replace(/\s/g, ''))) {
-          // 品質区分：後続の品質/純粋価格行数をカウントしてskipロジックで対応名前を探す
-          let following = 0;
-          for (let k = i + 1; k < lines.length; k++) {
-            const next = lines[k];
-            if (next === null || next === '') continue;
-            if (!isPriceLine(next) || DATE_PAT.test(next) || TIME_PAT.test(next)) break;
-            const np = getPrefix(next);
-            if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) following++;
-            else break;
-          }
-          const name = findNameAbove(i - 1, following);
-          addItem(name ? name + ' ' + prefix : prefix, extractAmt(line));
-        } else {
-          addItem(prefix, extractAmt(line));
-        }
-        usedIdx.add(i); // A型行を使用済みとしてマーク
-        continue;
-      }
-
-      // B型 + 金額アンカー方式：上方向に商品名を探す
-      // 連続する金額ブロックの場合、後続の価格行数だけ名前をスキップして対応する名前を取得
-      // ※ following は純粋な価格行と品質区分A型行の合計（通常のA型izable行は除外）
-      const price = extractAmt(line);
-      if (price !== null) {
-        const QUALITY_RE = /^[特並上下大小中極超高低優A-Za-z]{1,3}$/;
-        let following = 0;
-        for (let k = i + 1; k < lines.length; k++) {
-          const next = lines[k];
-          if (next === null || next === '') continue;
-          if (!isPriceLine(next) || DATE_PAT.test(next) || TIME_PAT.test(next)) break;
-          const np = getPrefix(next);
-          if (!np || QUALITY_RE.test(cleanName(np).replace(/\s/g, ''))) {
-            // T/E付きかつ金額が異なる行のみ別商品としてカウント
-            // T/Eなし行=OCR分割行、同一金額T/E行=同商品の補完行 はカウントせず
-            const nextAmt = extractAmt(next);
-            if (/[TE]\s*$/.test(next) && nextAmt !== null) {
-              if (nextAmt !== price) following++;
-              else break; // 同一金額T/E行 → 同商品の補完行 → ここで打ち切り
-            }
-            // T/Eなし行は継続（次のT/E行を探す）
-          } else break;
-        }
-        const name = findNameAbove(i - 1, following);
-        if (name) addItem(name, price);
-      }
-    }
-
-    return { storeName, totalAmount, items };
+    const parsed = JSON.parse(match[0]);
+    return {
+      storeName:   String(parsed.storeName  ?? '').trim(),
+      totalAmount: Number(parsed.totalAmount) || 0,
+      items: (parsed.items ?? [])
+        .map(it => ({ name: String(it.name ?? '').trim(), price: Number(it.price) || 0 }))
+        .filter(it => it.name && it.price > 0),
+    };
   }
 
   // ── 商品リスト操作 ────────────────────────────────────────────
@@ -1405,7 +1109,7 @@
    * 最終的に全員の合計がレシート合計と完全一致することを保証する。
    *
    * @param {Array}  itemList     - items 配列（price + checked を持つオブジェクト）
-   * @param {number} receiptTotal - レシート合計金額（parseReceiptItems の totalAmount）
+   * @param {number} receiptTotal - レシート合計金額
    * @param {string} [payer]      - 端数調整を受けるメンバーキー（default: 'me'）
    * @returns {Object}            - メンバーキーごとの最終負担額 { me, a, b, c }
    */
