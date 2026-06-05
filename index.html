@@ -1255,11 +1255,14 @@ ${text}`;
   function hint(item) {
     if (item.quantity > 1) {
       const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
+      if (totalAssigned === 0) return `<b>⚠️ ${item.quantity}個を誰かに割り当ててください</b>`;
       const parts = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0)
         .map(m => `${m.label}×${item.qty[m.key]}`).join(' ＋ ');
       const unassigned = item.quantity - totalAssigned;
-      const suffix = unassigned > 0 ? `　自分に残り${unassigned}個` : '　<b>✓ 割り当て完了</b>';
-      return (parts || '未割り当て') + suffix;
+      const suffix = unassigned > 0
+        ? `　<b>⚠️ 残り${unassigned}個を割り当ててください</b>`
+        : '　<b>✓ 割り当て完了</b>';
+      return parts + suffix;
     }
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) return '<b>自分に全額加算</b>';
@@ -1296,7 +1299,9 @@ ${text}`;
         }).join('');
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
-          : `<div class="qty-remaining">残り ${remaining}個</div>`;
+          : totalAssigned === 0
+            ? `<div class="qty-remaining">⚠️ ${item.quantity}個を割り当ててください</div>`
+            : `<div class="qty-remaining">残り ${remaining}個</div>`;
         controls = remainingLabel
           + `<div class="qty-checks">${qtyRows}</div>`
           + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`;
