@@ -69,7 +69,24 @@
       padding-bottom: 12px;
       border-bottom: 1px solid #FFE8E8;
       letter-spacing: 2px;
-      text-transform: uppercase;
+    }
+    .add-form-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .add-form-title.open {
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #FFE8E8;
+    }
+    .add-form-title #addFormChevron {
+      font-size: 10px;
+      color: #ccc;
     }
 
     /* ========== フォーム ========== */
@@ -880,12 +897,17 @@
   <!-- ===== 左カラム: 入力 ===== -->
   <div class="col-left">
     <div class="card">
-      <div class="card-title">商品を追加</div>
-      <div class="form-grid">
-        <input type="text" id="itemName" placeholder="商品名（例: ピザ）">
-        <input type="number" id="itemPrice" placeholder="¥ 金額" min="0">
+      <div class="card-title add-form-title" onclick="toggleAddForm()">
+        商品を追加
+        <span id="addFormChevron">▼</span>
       </div>
-      <button class="btn-add" id="btnAdd">+ 追加する</button>
+      <div id="addFormBody" style="display:none">
+        <div class="form-grid">
+          <input type="text" id="itemName" placeholder="商品名（例: ピザ）">
+          <input type="number" id="itemPrice" placeholder="¥ 金額" min="0">
+        </div>
+        <button class="btn-add" id="btnAdd">+ 追加する</button>
+      </div>
     </div>
 
     <div id="itemList">
@@ -1230,6 +1252,7 @@ ${text}`;
     if (item.fromReceipt) receiptTotal = Math.max(0, receiptTotal - item.price);
     items.splice(i, 1);
     if (editingState?.id === id) editingState = null;
+    openItemIds.delete(id);
     render();
   }
 
@@ -1240,16 +1263,17 @@ ${text}`;
 
   // ── インライン編集 ───────────────────────────────────────────
   let editingState = null; // { id, field: 'name' | 'price' }
-  let openItemId   = null; // 展開中の商品カード id
+  let openItemIds  = new Set(); // 展開中の商品カード id セット
 
   window.toggleItem = function(id) {
-    openItemId = (openItemId === id) ? null : id;
+    if (openItemIds.has(id)) openItemIds.delete(id);
+    else openItemIds.add(id);
     render();
   };
 
   function startEdit(id, field) {
-    openItemId    = id; // カードを展開してから編集
-    editingState  = { id, field };
+    openItemIds.add(id); // カードを展開してから編集
+    editingState = { id, field };
     render();
   }
 
@@ -1410,6 +1434,9 @@ ${text}`;
 
     $('itemList').innerHTML = items.map(item => {
       let controls, priceBadge;
+      // qty>1 の商品は初回表示時に自動展開
+      if (item.quantity > 1) openItemIds.add(item.id);
+      const isOpen      = openItemIds.has(item.id);
       const isEditName  = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'name';
       const isEditPrice = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'price';
 
@@ -1433,9 +1460,7 @@ ${text}`;
         }).join('');
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
-          : totalAssigned === 0
-            ? `<div class="qty-remaining">⚠️ ${item.quantity}個を割り当ててください</div>`
-            : `<div class="qty-remaining">残り ${remaining}個</div>`;
+          : `<div class="qty-remaining">残り ${remaining}個</div>`;
         controls = remainingLabel
           + `<div class="qty-checks">${qtyRows}</div>`
           + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`;
@@ -1455,23 +1480,21 @@ ${text}`;
         priceBadge = `¥${item.price.toLocaleString()}`;
       }
 
-      const isOpen = item.id === openItemId;
-
-      // 商品名 HTML（レシート商品はタップで編集可）
+      // 商品名 HTML（レシート商品は展開時のみ編集可）
       const nameHtml = isEditName
         ? `<input class="edit-input edit-input-focus" type="text" value="${esc(item.name)}"
              onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'name',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'name',this.value)">`
-        : `<div class="item-name${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</div>`;
+        : `<div class="item-name${(item.fromReceipt && isOpen) ? ' editable-field' : ''}"${(item.fromReceipt && isOpen) ? ` onclick="event.stopPropagation();startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${(item.fromReceipt && isOpen) ? '<span class="edit-icon">✎</span>' : ''}</div>`;
 
-      // 価格バッジ HTML（レシート商品はタップで編集可）
+      // 価格バッジ HTML（レシート商品は展開時のみ編集可）
       const badgeHtml = isEditPrice
         ? `<span class="item-price-badge"><input class="edit-input edit-price-input edit-input-focus" type="number" value="${item.price}" min="1"
              onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'price',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'price',this.value)"></span>`
-        : `<span class="item-price-badge${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'price')"` : ''}>${priceBadge}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</span>`;
+        : `<span class="item-price-badge${(item.fromReceipt && isOpen) ? ' editable-field' : ''}"${(item.fromReceipt && isOpen) ? ` onclick="event.stopPropagation();startEdit(${item.id},'price')"` : ''}>${priceBadge}${(item.fromReceipt && isOpen) ? '<span class="edit-icon">✎</span>' : ''}</span>`;
 
       return `<div class="item-card${isOpen ? ' open' : ''}" onclick="toggleItem(${item.id})">`
         + `<div class="item-top">`
@@ -1573,6 +1596,19 @@ ${text}`;
     const converted = zenToHan(this.value);
     if (converted) this.value = converted;
   });
+
+  // 商品を追加フォームの折りたたみ
+  let addFormOpen = false;
+  window.toggleAddForm = function() {
+    addFormOpen = !addFormOpen;
+    const body    = $('addFormBody');
+    const chevron = $('addFormChevron');
+    const title   = chevron.closest('.add-form-title');
+    body.style.display = addFormOpen ? '' : 'none';
+    chevron.textContent = addFormOpen ? '▲' : '▼';
+    title.classList.toggle('open', addFormOpen);
+    if (addFormOpen) $('itemName').focus();
+  };
 
   // 商品を追加 / Enter キーでフォーカス移動
   $('btnAdd').addEventListener('click', addItem);
