@@ -1997,6 +1997,7 @@ ${text}`;
 
   // ── カメラ画面 ────────────────────────────────────────────────
   let cameraStream = null;
+  let awaitingLibrarySelection = false;
 
   async function startCamera() {
     const video = $('cameraVideo');
@@ -2030,7 +2031,9 @@ ${text}`;
 
   function switchCameraTab(tab) {
     if (tab === 'library') {
-      stopCamera(); // カメラを止めてからライブラリを開く
+      stopCamera();
+      awaitingLibrarySelection = true;
+      $('libInput').value = ''; // 同じファイルを再選択できるようリセット
       $('libInput').click();
       return;
     }
@@ -2072,10 +2075,29 @@ ${text}`;
     if (file) { showScreen('screen-upload'); handleFile(file); }
   });
 
+  // ライブラリ: キャンセル検出（モダンブラウザ）→ カメラ再起動
+  $('libInput').addEventListener('cancel', () => {
+    if (!awaitingLibrarySelection) return;
+    awaitingLibrarySelection = false;
+    startCamera();
+  });
+
+  // ライブラリ: キャンセル検出フォールバック（windowフォーカス復帰時）
+  window.addEventListener('focus', () => {
+    if (!awaitingLibrarySelection) return;
+    setTimeout(() => {
+      if (awaitingLibrarySelection) {
+        awaitingLibrarySelection = false;
+        startCamera();
+      }
+    }, 400);
+  }, true);
+
   // ライブラリ: ファイル選択 → 即OCR画面へ
   $('libInput').addEventListener('change', e => {
+    awaitingLibrarySelection = false;
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file) { startCamera(); return; }
     selectedFile = file;
     stopCamera();
     showScreen('screen-upload');
