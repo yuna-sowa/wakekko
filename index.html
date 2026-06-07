@@ -351,6 +351,43 @@
     .qty-remaining.complete { color: #5CBF8A; }
     .qty-total-hint { font-size: 11px; color: #ddd; margin-top: 4px; text-align: right; }
 
+    .btn-split-all {
+      width: 100%;
+      padding: 8px 14px;
+      background: #FFF8F8;
+      border: 1.5px dashed #F0A8B0;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #C85060;
+      cursor: pointer;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      transition: all 0.2s;
+      font-family: inherit;
+      text-align: center;
+    }
+    .btn-split-all:hover { background: #FFE8E8; border-color: #E8707A; }
+    .btn-split-all.active { background: #FFF0F0; border-style: solid; border-color: #E8707A; }
+
+    .btn-all-split {
+      width: 100%;
+      padding: 10px 14px;
+      background: #FFF5F5;
+      border: 1.5px solid #F0D8D8;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #E8707A;
+      cursor: pointer;
+      letter-spacing: 1px;
+      margin-bottom: 14px;
+      transition: all 0.2s;
+      font-family: inherit;
+      text-align: center;
+    }
+    .btn-all-split:hover { background: #FFE8E8; border-color: #E8707A; }
+
     .empty-msg {
       text-align: center;
       color: #ccc;
@@ -1297,7 +1334,7 @@
               id: Date.now() + (Math.random() * 1000 | 0),
               name: it.name, price: it.price,
               quantity: it.quantity || 1, unitPrice: it.unitPrice || null,
-              checked, qty, fromReceipt: true,
+              checked, qty, fromReceipt: true, splitAll: false,
             });
           });
           render();
@@ -1432,7 +1469,7 @@ ${text}`;
 
     const checked = {};
     MEMBERS.forEach(m => (checked[m.key] = false));
-    items.push({ id: Date.now(), name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false });
+    items.push({ id: Date.now(), name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false, splitAll: false });
 
     $('itemName').value  = '';
     $('itemPrice').value = '';
@@ -1506,6 +1543,16 @@ ${text}`;
     render();
   }
 
+  window.setSplitAll = function(id, val) {
+    const item = items.find(x => x.id === id);
+    if (item) { item.splitAll = val; render(); }
+  };
+
+  window.setAllSplitAll = function() {
+    items.forEach(item => { item.splitAll = true; });
+    render();
+  };
+
   // 各メンバーの負担額を計算する。
   // 個数割り当てモード（quantity > 1）: 割り当て個数×単価で按分、端数は先頭から1円加算。
   // チェックモード: 1円未満の端数は先頭のメンバーから順に1円ずつ上乗せして完全に分配する。
@@ -1513,6 +1560,13 @@ ${text}`;
   function calcShares(item) {
     const shares = {};
     MEMBERS.forEach(m => (shares[m.key] = 0));
+
+    if (item.splitAll) {
+      const base = Math.floor(item.price / MEMBERS.length);
+      const rem  = item.price % MEMBERS.length;
+      MEMBERS.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
+      return shares;
+    }
 
     if (item.quantity > 1) {
       const assigned = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0);
@@ -1604,6 +1658,7 @@ ${text}`;
 
   // 商品カードに表示する割り勘ヒント文を返す
   function hint(item) {
+    if (item.splitAll) return `全員 (${MEMBERS.length}人) で <b>均等割り</b>`;
     if (item.quantity > 1) {
       const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
       if (totalAssigned === 0) return `<b>⚠️ ${item.quantity}個を誰かに割り当ててください</b>`;
@@ -1627,7 +1682,8 @@ ${text}`;
       return;
     }
 
-    $('itemList').innerHTML = items.map(item => {
+    const bulkBtn = `<button class="btn-all-split" onclick="setAllSplitAll()">全明細を全員で割り勘に設定</button>`;
+    $('itemList').innerHTML = bulkBtn + items.map(item => {
       let controls, priceBadge;
       // qty>1 の商品は初回表示時に自動展開
       if (item.quantity > 1) openItemIds.add(item.id);
@@ -1656,9 +1712,10 @@ ${text}`;
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
           : `<div class="qty-remaining">残り ${remaining}個</div>`;
-        controls = remainingLabel
-          + `<div class="qty-checks">${qtyRows}</div>`
-          + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`;
+        const splitAllBtnQty = `<button class="btn-split-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">${item.splitAll ? '✓ 全員で割り勘中 — 個別に変更する' : '全員で均等割りにする'}</button>`;
+        controls = splitAllBtnQty + (!item.splitAll
+          ? remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`
+          : '');
         priceBadge = `¥${item.price.toLocaleString()} `
           + `<span class="qty-unit-hint">(¥${item.unitPrice.toLocaleString()}×${item.quantity})</span>`;
       } else {
@@ -1671,7 +1728,8 @@ ${text}`;
             + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
             + `</span>`;
         }).join('');
-        controls = `<div class="checks">${pills}</div>`;
+        const splitAllBtnChk = `<button class="btn-split-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">${item.splitAll ? '✓ 全員で割り勘中 — 個別に変更する' : '全員で均等割りにする'}</button>`;
+        controls = splitAllBtnChk + (!item.splitAll ? `<div class="checks">${pills}</div>` : '');
         priceBadge = `¥${item.price.toLocaleString()}`;
       }
 
@@ -1729,7 +1787,7 @@ ${text}`;
 
     // qty≥2で未割り当て商品があるときはレシート合計按分を使わない（差額が歪むため）
     const hasUnassignedQty = items.some(it =>
-      it.quantity > 1 && MEMBERS.reduce((s, m) => s + (it.qty?.[m.key] || 0), 0) < it.quantity
+      it.quantity > 1 && !it.splitAll && MEMBERS.reduce((s, m) => s + (it.qty?.[m.key] || 0), 0) < it.quantity
     );
 
     let totals, adjRow = null, splitWarning = null;
