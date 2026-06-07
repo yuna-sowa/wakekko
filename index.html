@@ -280,6 +280,20 @@
       color: #407040;
       font-weight: 700;
     }
+    /* Fさん: コーラルピーチ（有料版） */
+    .pill input:checked + label.cl-f {
+      border-color: #E8A898;
+      background: #FFF5F2;
+      color: #A04858;
+      font-weight: 700;
+    }
+    /* Gさん: ゴールドオリーブ（有料版） */
+    .pill input:checked + label.cl-g {
+      border-color: #C8B870;
+      background: #FAFAE8;
+      color: #706830;
+      font-weight: 700;
+    }
 
     .split-note {
       font-size: 11px;
@@ -337,6 +351,8 @@
     .qty-label.cl-c  { border-color: #E8C098; background: #FFF8F0; color: #A87030; }
     .qty-label.cl-d  { border-color: #90B8D8; background: #F0F6FA; color: #406080; }
     .qty-label.cl-e  { border-color: #A8C4A0; background: #F2FAF0; color: #407040; }
+    .qty-label.cl-f  { border-color: #E8A898; background: #FFF5F2; color: #A04858; }
+    .qty-label.cl-g  { border-color: #C8B870; background: #FAFAE8; color: #706830; }
     .qty-ctrl { display: flex; align-items: center; gap: 12px; }
     .qty-btn {
       background: #FFF5F5;
@@ -435,6 +451,8 @@
     .total-box.c  { background: #FFF8F0; }
     .total-box.d  { background: #F0F6FA; }
     .total-box.e  { background: #F2FAF0; }
+    .total-box.f  { background: #FFF5F2; }
+    .total-box.g  { background: #FAFAE8; }
 
     .total-name {
       font-size: 11px;
@@ -448,6 +466,8 @@
     .total-box.c  .total-name { color: #A87030; }
     .total-box.d  .total-name { color: #406080; }
     .total-box.e  .total-name { color: #407040; }
+    .total-box.f  .total-name { color: #A04858; }
+    .total-box.g  .total-name { color: #706830; }
 
     .total-yen {
       font-size: 26px;
@@ -479,6 +499,8 @@
     .detail-table thead .h-c  { color: #A87030; }
     .detail-table thead .h-d  { color: #406080; }
     .detail-table thead .h-e  { color: #407040; }
+    .detail-table thead .h-f  { color: #A04858; }
+    .detail-table thead .h-g  { color: #706830; }
 
     .detail-table tbody td {
       padding: 11px 6px;
@@ -892,6 +914,33 @@
       padding: 10px 14px;
     }
     .pill-lock { font-size: 9px; vertical-align: middle; margin-left: 2px; }
+    .paid-pills-expanded {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      animation: sdFadeRise 0.22s ease;
+    }
+    .paid-toast {
+      position: fixed;
+      bottom: 52px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(50,35,25,0.86);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 10px 22px;
+      border-radius: 22px;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    .paid-toast.show { opacity: 1; }
 
     /* CTAボタン */
     .btn-start {
@@ -1218,9 +1267,16 @@
       <button class="member-pill" data-count="2">2人</button>
       <button class="member-pill" data-count="3">3人</button>
       <button class="member-pill active" data-count="4">4人</button>
-      <button class="member-pill locked" data-count="5">5人<span class="pill-lock">🔒</span></button>
+      <button class="member-pill locked" id="paidToggle">5〜8人<span class="pill-lock">🔒</span></button>
+    </div>
+    <div class="paid-pills-expanded" id="paidPillsExpanded" style="display:none">
+      <button class="member-pill locked paid-count" data-count="5">5人</button>
+      <button class="member-pill locked paid-count" data-count="6">6人</button>
+      <button class="member-pill locked paid-count" data-count="7">7人</button>
+      <button class="member-pill locked paid-count" data-count="8">8人</button>
     </div>
   </div>
+  <div class="paid-toast" id="paidToast">有料版で利用できます</div>
 
   <button class="btn-start" id="btnGoUpload">
     <span class="btn-start-icon">🧾</span>
@@ -1352,6 +1408,8 @@
     { key: 'c',  label: 'Cさん', cl: 'cl-c',  box: 'c',  hcl: 'h-c',  fcl: 'f-c'  },
     { key: 'd',  label: 'Dさん', cl: 'cl-d',  box: 'd',  hcl: 'h-d',  fcl: 'f-d'  }, // 有料版
     { key: 'e',  label: 'Eさん', cl: 'cl-e',  box: 'e',  hcl: 'h-e',  fcl: 'f-e'  }, // 有料版
+    { key: 'f',  label: 'Fさん', cl: 'cl-f',  box: 'f',  hcl: 'h-f',  fcl: 'f-f'  }, // 有料版
+    { key: 'g',  label: 'Gさん', cl: 'cl-g',  box: 'g',  hcl: 'h-g',  fcl: 'f-g'  }, // 有料版
   ];
   const FREE_MAX = 4;
   let memberCount = 4;
@@ -2063,16 +2121,29 @@ ${text}`;
     if (confirm('すべての商品をクリアしますか？')) { items.length = 0; receiptTotal = 0; render(); }
   });
 
-  // 人数選択ピル
-  document.querySelectorAll('.member-pill').forEach(pill => {
+  // 人数選択ピル（無料）
+  document.querySelectorAll('.member-pill:not(.locked)').forEach(pill => {
     pill.addEventListener('click', () => {
-      if (pill.classList.contains('locked')) return;
       memberCount = parseInt(pill.dataset.count);
       MEMBERS = ALL_MEMBERS.slice(0, memberCount);
       document.querySelectorAll('.member-pill').forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
     });
   });
+
+  // 有料ピル: 展開トグル＋トースト
+  let paidToastTimer = null;
+  function showPaidToast() {
+    clearTimeout(paidToastTimer);
+    $('paidToast').classList.add('show');
+    paidToastTimer = setTimeout(() => $('paidToast').classList.remove('show'), 2200);
+  }
+  $('paidToggle').addEventListener('click', () => {
+    const exp = $('paidPillsExpanded');
+    exp.style.display = exp.style.display === 'none' ? 'flex' : 'none';
+    showPaidToast();
+  });
+  document.querySelectorAll('.paid-count').forEach(p => p.addEventListener('click', showPaidToast));
 
   // もどるボタン → スタート画面へ
   $('btnBack').addEventListener('click', () => showScreen('screen-start'));
