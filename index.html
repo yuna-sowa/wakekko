@@ -655,40 +655,6 @@
     }
     .btn-shutter:active { transform: scale(0.91); }
 
-    #libraryView {
-      position: absolute;
-      inset: 0;
-      background: #FAF8F4;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      padding: max(env(safe-area-inset-top, 0px), 72px) 24px max(env(safe-area-inset-bottom, 0px), 32px);
-      gap: 16px;
-    }
-    .lib-drop-area {
-      flex: 1;
-      min-height: 220px;
-      border: 2px dashed #D4C4B8;
-      border-radius: 24px;
-      background: #FFFAF7;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.2s;
-    }
-    .lib-drop-area:hover     { border-color: #C9673A; }
-    .lib-drop-area.has-image { border-style: solid; border-color: #C9673A; }
-    .lib-drop-area .preview-img       { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .lib-drop-area.has-image .preview-img   { display: block; }
-    .lib-drop-area .lib-placeholder         { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-    .lib-drop-area.has-image .lib-placeholder { opacity: 0; pointer-events: none; }
-    .lib-drop-area .preview-badge { display: none; position: absolute; bottom: 14px; right: 14px; background: rgba(201,103,58,0.88); color: #fff; font-size: 11px; font-weight: 700; padding: 6px 14px; border-radius: 20px; }
-    .lib-drop-area.has-image .preview-badge { display: block; }
 
     /* ========== スタート画面 ========== */
     #screen-start {
@@ -1203,20 +1169,8 @@
     </div>
   </div>
 
-  <!-- ライブラリビュー -->
-  <div id="libraryView" style="display:none">
-    <label class="lib-drop-area" id="libDropArea" for="libInput">
-      <div class="lib-placeholder">
-        <div class="upload-zone-icon">🖼️</div>
-        <div class="upload-zone-label">タップして選択</div>
-        <div class="upload-zone-sub">JPG · PNG · HEIC に対応</div>
-      </div>
-      <img class="preview-img" id="libPreviewImg" alt="">
-      <div class="preview-badge">✓ 選択済み</div>
-    </label>
-    <input type="file" id="libInput" accept="image/*" style="display:none">
-    <button class="btn-analyze" id="btnLibAnalyze" disabled>解析する</button>
-  </div>
+  <!-- ライブラリ用input（タブタップ時に直接起動） -->
+  <input type="file" id="libInput" accept="image/*" style="display:none">
 
   <!-- カメラ権限なし時のフォールバック -->
   <input type="file" id="captureInput" accept="image/*" capture="environment" style="display:none">
@@ -2063,20 +2017,25 @@ ${text}`;
       cameraStream.getTracks().forEach(t => t.stop());
       cameraStream = null;
     }
+    const video = $('cameraVideo');
+    if (video) video.srcObject = null;
   }
 
   function openCameraScreen() {
     showScreen('screen-camera');
-    switchCameraTab('camera');
+    $('tabCamera').classList.add('active');
+    $('tabLibrary').classList.remove('active');
+    startCamera();
   }
 
   function switchCameraTab(tab) {
-    const isCamera = tab === 'camera';
-    $('cameraView').style.display    = isCamera ? '' : 'none';
-    $('libraryView').style.display   = isCamera ? 'none' : '';
-    $('tabCamera').classList.toggle('active', isCamera);
-    $('tabLibrary').classList.toggle('active', !isCamera);
-    if (isCamera) { startCamera(); } else { stopCamera(); }
+    if (tab === 'library') {
+      $('libInput').click(); // 直接ライブラリピッカーを開く
+      return;
+    }
+    $('tabCamera').classList.add('active');
+    $('tabLibrary').classList.remove('active');
+    startCamera();
   }
 
   function capturePhoto() {
@@ -2112,24 +2071,14 @@ ${text}`;
     if (file) { showScreen('screen-upload'); handleFile(file); }
   });
 
-  // ライブラリ: ファイル選択
+  // ライブラリ: ファイル選択 → 即OCR画面へ
   $('libInput').addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
     selectedFile = file;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      $('libPreviewImg').src = ev.target.result;
-      $('libDropArea').classList.add('has-image');
-      $('btnLibAnalyze').disabled     = false;
-      $('btnLibAnalyze').textContent  = '解析する';
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // ライブラリ: 解析ボタン
-  $('btnLibAnalyze').addEventListener('click', () => {
-    if (selectedFile) { stopCamera(); showScreen('screen-upload'); handleFile(selectedFile); }
+    stopCamera();
+    showScreen('screen-upload');
+    handleFile(file);
   });
 
   // アップロード画面のサブボタン（ライブラリ / カメラ）
