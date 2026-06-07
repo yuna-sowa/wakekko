@@ -266,6 +266,20 @@
       color: #A87030;
       font-weight: 700;
     }
+    /* Dさん: スカイブルー（有料版） */
+    .pill input:checked + label.cl-d {
+      border-color: #90B8D8;
+      background: #F0F6FA;
+      color: #406080;
+      font-weight: 700;
+    }
+    /* Eさん: セージグリーン（有料版） */
+    .pill input:checked + label.cl-e {
+      border-color: #A8C4A0;
+      background: #F2FAF0;
+      color: #407040;
+      font-weight: 700;
+    }
 
     .split-note {
       font-size: 11px;
@@ -321,6 +335,8 @@
     .qty-label.cl-a  { border-color: #90C8B8; background: #F0FAF6; color: #408070; }
     .qty-label.cl-b  { border-color: #C0B0D8; background: #F5F0FA; color: #685088; }
     .qty-label.cl-c  { border-color: #E8C098; background: #FFF8F0; color: #A87030; }
+    .qty-label.cl-d  { border-color: #90B8D8; background: #F0F6FA; color: #406080; }
+    .qty-label.cl-e  { border-color: #A8C4A0; background: #F2FAF0; color: #407040; }
     .qty-ctrl { display: flex; align-items: center; gap: 12px; }
     .qty-btn {
       background: #FFF5F5;
@@ -417,6 +433,8 @@
     .total-box.a  { background: #F0FAF6; }
     .total-box.b  { background: #F5F0FA; }
     .total-box.c  { background: #FFF8F0; }
+    .total-box.d  { background: #F0F6FA; }
+    .total-box.e  { background: #F2FAF0; }
 
     .total-name {
       font-size: 11px;
@@ -428,6 +446,8 @@
     .total-box.a  .total-name { color: #408070; }
     .total-box.b  .total-name { color: #685088; }
     .total-box.c  .total-name { color: #A87030; }
+    .total-box.d  .total-name { color: #406080; }
+    .total-box.e  .total-name { color: #407040; }
 
     .total-yen {
       font-size: 26px;
@@ -457,6 +477,8 @@
     .detail-table thead .h-a  { color: #408070; }
     .detail-table thead .h-b  { color: #685088; }
     .detail-table thead .h-c  { color: #A87030; }
+    .detail-table thead .h-d  { color: #406080; }
+    .detail-table thead .h-e  { color: #407040; }
 
     .detail-table tbody td {
       padding: 11px 6px;
@@ -823,6 +845,54 @@
       animation: sdFadeRise 0.55s 0.42s ease both;
     }
 
+    /* ========== 人数選択 ========== */
+    .start-member-select {
+      margin-bottom: 32px;
+      text-align: center;
+      animation: sdFadeRise 0.55s 0.49s ease both;
+    }
+    .start-member-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #B8A090;
+      letter-spacing: 2.5px;
+      margin-bottom: 14px;
+    }
+    .start-member-pills {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .member-pill {
+      padding: 10px 18px;
+      border: 2px solid #E8D8CC;
+      border-radius: 100px;
+      background: rgba(255,255,255,0.75);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      color: #B09888;
+      cursor: pointer;
+      transition: all 0.18s;
+      letter-spacing: 0.5px;
+      position: relative;
+    }
+    .member-pill:not(.locked):hover { border-color: #C9673A; color: #C9673A; background: #fff; }
+    .member-pill.active {
+      background: #C9673A;
+      border-color: #C9673A;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(201,103,58,0.28);
+    }
+    .member-pill.locked {
+      opacity: 0.45;
+      cursor: default;
+      border-style: dashed;
+      font-size: 13px;
+      padding: 10px 14px;
+    }
+    .pill-lock { font-size: 9px; vertical-align: middle; margin-left: 2px; }
+
     /* CTAボタン */
     .btn-start {
       width: 100%;
@@ -1142,6 +1212,16 @@
   <div class="start-logo">わけっこ</div>
   <div class="start-tagline">レシートを読み込んで<br>かんたん割り勘</div>
 
+  <div class="start-member-select">
+    <div class="start-member-label">何人で割り勘？</div>
+    <div class="start-member-pills">
+      <button class="member-pill" data-count="2">2人</button>
+      <button class="member-pill" data-count="3">3人</button>
+      <button class="member-pill active" data-count="4">4人</button>
+      <button class="member-pill locked" data-count="5">5人<span class="pill-lock">🔒</span></button>
+    </div>
+  </div>
+
   <button class="btn-start" id="btnGoUpload">
     <span class="btn-start-icon">🧾</span>
     <span>レシートを読み込む</span>
@@ -1265,12 +1345,17 @@
      ================================================================ */
 
   // ── 定数・状態 ────────────────────────────────────────────────
-  const MEMBERS = [
+  const ALL_MEMBERS = [
     { key: 'me', label: '自分',  cl: 'cl-me', box: 'me', hcl: 'h-me', fcl: 'f-me' },
     { key: 'a',  label: 'Aさん', cl: 'cl-a',  box: 'a',  hcl: 'h-a',  fcl: 'f-a'  },
     { key: 'b',  label: 'Bさん', cl: 'cl-b',  box: 'b',  hcl: 'h-b',  fcl: 'f-b'  },
     { key: 'c',  label: 'Cさん', cl: 'cl-c',  box: 'c',  hcl: 'h-c',  fcl: 'f-c'  },
+    { key: 'd',  label: 'Dさん', cl: 'cl-d',  box: 'd',  hcl: 'h-d',  fcl: 'f-d'  }, // 有料版
+    { key: 'e',  label: 'Eさん', cl: 'cl-e',  box: 'e',  hcl: 'h-e',  fcl: 'f-e'  }, // 有料版
   ];
+  const FREE_MAX = 4;
+  let memberCount = 4;
+  let MEMBERS = ALL_MEMBERS.slice(0, memberCount);
 
   const items = [];
   const $ = id => document.getElementById(id);
@@ -1976,6 +2061,17 @@ ${text}`;
   $('btnClear').addEventListener('click', () => {
     if (items.length === 0) return;
     if (confirm('すべての商品をクリアしますか？')) { items.length = 0; receiptTotal = 0; render(); }
+  });
+
+  // 人数選択ピル
+  document.querySelectorAll('.member-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      if (pill.classList.contains('locked')) return;
+      memberCount = parseInt(pill.dataset.count);
+      MEMBERS = ALL_MEMBERS.slice(0, memberCount);
+      document.querySelectorAll('.member-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
   });
 
   // もどるボタン → スタート画面へ
