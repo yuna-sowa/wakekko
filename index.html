@@ -1265,7 +1265,7 @@
     <div class="start-member-label">何人で割り勘？</div>
     <div class="member-stepper">
       <button class="stepper-btn" id="stepperMinus" disabled>−</button>
-      <div class="stepper-display"><span id="stepperCount">4</span><span class="stepper-unit">人</span></div>
+      <div class="stepper-display"><span id="stepperCount">2</span><span class="stepper-unit">人</span></div>
       <button class="stepper-btn" id="stepperPlus">＋</button>
     </div>
   </div>
@@ -1405,7 +1405,7 @@
     { key: 'g',  label: 'Gさん', cl: 'cl-g',  box: 'g',  hcl: 'h-g',  fcl: 'f-g'  }, // 有料版
   ];
   const FREE_MAX = 4;
-  let memberCount = 4;
+  let memberCount = Math.min(parseInt(localStorage.getItem('memberCount') || '2', 10), FREE_MAX);
   let MEMBERS = ALL_MEMBERS.slice(0, memberCount);
 
   const items = [];
@@ -2130,12 +2130,14 @@ ${text}`;
     if (memberCount <= 2) return;
     memberCount--;
     MEMBERS = ALL_MEMBERS.slice(0, memberCount);
+    localStorage.setItem('memberCount', memberCount);
     updateStepper();
   });
   $('stepperPlus').addEventListener('click', () => {
     if (memberCount >= FREE_MAX) { showPaidToast(); return; }
     memberCount++;
     MEMBERS = ALL_MEMBERS.slice(0, memberCount);
+    localStorage.setItem('memberCount', memberCount);
     updateStepper();
   });
   updateStepper();
