@@ -1923,24 +1923,29 @@ ${text}`;
   // スタート画面の「レシートを読み込む」→ ボトムシート表示
   $('btnGoUpload').addEventListener('click', () => {
     $('bottomSheetOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
   });
 
   // ボトムシート: オーバーレイ・キャンセルで閉じる
+  function closeBottomSheet() {
+    $('bottomSheetOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }
   $('bottomSheetOverlay').addEventListener('click', e => {
-    if (e.target === $('bottomSheetOverlay')) $('bottomSheetOverlay').classList.remove('open');
+    if (e.target === $('bottomSheetOverlay')) closeBottomSheet();
   });
-  $('bsBtnCancel').addEventListener('click', () => $('bottomSheetOverlay').classList.remove('open'));
+  $('bsBtnCancel').addEventListener('click', closeBottomSheet);
 
-  // ボトムシート: カメラ
+  // ボトムシート: カメラ（inputクリックを先に実行してiOSのジェスチャー制限を回避）
   $('bsBtnCamera').addEventListener('click', () => {
-    $('bottomSheetOverlay').classList.remove('open');
     $('startCameraInput').click();
+    closeBottomSheet();
   });
 
-  // ボトムシート: ライブラリ
+  // ボトムシート: ライブラリ（同上）
   $('bsBtnLibrary').addEventListener('click', () => {
-    $('bottomSheetOverlay').classList.remove('open');
     $('startLibraryInput').click();
+    closeBottomSheet();
   });
 
   // スタート画面でカメラ撮影 → アップロード画面を開いて OCR 自動開始
