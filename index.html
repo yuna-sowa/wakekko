@@ -1198,21 +1198,8 @@
     <!-- カメラ専用 input（capture） -->
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none">
 
-    <!-- サブボタン行 -->
-    <div class="upload-btn-row">
-      <button class="btn-upload-opt" id="btnLibrary">
-        <span class="btn-upload-opt-icon">🖼️</span>
-        <span>ライブラリから</span>
-      </button>
-      <button class="btn-upload-opt" id="btnCamera">
-        <span class="btn-upload-opt-icon">📷</span>
-        <span>写真を撮る</span>
-      </button>
-    </div>
-
-    <!-- 解析ボタン -->
-    <button class="btn-analyze" id="btnAnalyze" disabled>解析する</button>
-    <p class="upload-note">レシート全体が映るように撮影してください</p>
+    <!-- 解析ボタン（非表示・JS互換のため残す） -->
+    <button class="btn-analyze" id="btnAnalyze" disabled style="display:none"></button>
 
     <!-- OCR解析結果エリア -->
     <div id="ocrResult" style="display:none">
@@ -2103,10 +2090,6 @@ ${text}`;
     showScreen('screen-upload');
     handleFile(file);
   });
-
-  // アップロード画面のサブボタン（ライブラリ / カメラ）
-  $('btnLibrary').addEventListener('click', () => $('fileInput').click());
-  $('btnCamera').addEventListener('click',  () => $('cameraInput').click());
 
   // ファイル選択 → プレビュー表示 & OCR 自動開始
   $('fileInput').addEventListener('change',   e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
