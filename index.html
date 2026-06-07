@@ -1315,7 +1315,7 @@
       if (el) el.style.display = 'none';
     });
     const target = $(id);
-    if (target) target.style.display = (id === 'screen-upload' || id === 'screen-camera') ? 'flex' : 'block';
+    if (target) target.style.display = ['screen-start', 'screen-upload', 'screen-camera'].includes(id) ? 'flex' : 'block';
   }
 
   // ── OCR ──────────────────────────────────────────────────────
@@ -2030,7 +2030,8 @@ ${text}`;
 
   function switchCameraTab(tab) {
     if (tab === 'library') {
-      $('libInput').click(); // 直接ライブラリピッカーを開く
+      stopCamera(); // カメラを止めてからライブラリを開く
+      $('libInput').click();
       return;
     }
     $('tabCamera').classList.add('active');
