@@ -878,49 +878,47 @@
       font-weight: 700;
       color: #B8A090;
       letter-spacing: 2.5px;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
-    .start-member-pills {
+    .member-stepper {
       display: flex;
-      gap: 8px;
+      align-items: center;
       justify-content: center;
+      gap: 20px;
     }
-    .member-pill {
-      padding: 10px 18px;
+    .stepper-btn {
+      width: 44px; height: 44px;
+      border-radius: 50%;
       border: 2px solid #E8D8CC;
-      border-radius: 100px;
-      background: rgba(255,255,255,0.75);
+      background: rgba(255,255,255,0.8);
+      font-size: 22px;
+      color: #C9673A;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-family: inherit;
-      font-size: 15px;
+      font-weight: 700;
+      line-height: 1;
+      transition: all 0.18s;
+      flex-shrink: 0;
+    }
+    .stepper-btn:not(:disabled):hover { border-color: #C9673A; background: #fff; box-shadow: 0 2px 8px rgba(201,103,58,0.18); }
+    .stepper-btn:disabled { color: #D4C4B8; cursor: default; }
+    .stepper-display {
+      font-size: 30px;
+      font-weight: 900;
+      color: #C9673A;
+      min-width: 72px;
+      text-align: center;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+    .stepper-unit {
+      font-size: 16px;
       font-weight: 700;
       color: #B09888;
-      cursor: pointer;
-      transition: all 0.18s;
-      letter-spacing: 0.5px;
-      position: relative;
-    }
-    .member-pill:not(.locked):hover { border-color: #C9673A; color: #C9673A; background: #fff; }
-    .member-pill.active {
-      background: #C9673A;
-      border-color: #C9673A;
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(201,103,58,0.28);
-    }
-    .member-pill.locked {
-      opacity: 0.45;
-      cursor: default;
-      border-style: dashed;
-      font-size: 13px;
-      padding: 10px 14px;
-    }
-    .pill-lock { font-size: 9px; vertical-align: middle; margin-left: 2px; }
-    .paid-pills-expanded {
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 10px;
-      animation: sdFadeRise 0.22s ease;
+      margin-left: 1px;
     }
     .paid-toast {
       position: fixed;
@@ -1263,17 +1261,10 @@
 
   <div class="start-member-select">
     <div class="start-member-label">何人で割り勘？</div>
-    <div class="start-member-pills">
-      <button class="member-pill" data-count="2">2人</button>
-      <button class="member-pill" data-count="3">3人</button>
-      <button class="member-pill active" data-count="4">4人</button>
-      <button class="member-pill locked" id="paidToggle">5〜8人<span class="pill-lock">🔒</span></button>
-    </div>
-    <div class="paid-pills-expanded" id="paidPillsExpanded" style="display:none">
-      <button class="member-pill locked paid-count" data-count="5">5人</button>
-      <button class="member-pill locked paid-count" data-count="6">6人</button>
-      <button class="member-pill locked paid-count" data-count="7">7人</button>
-      <button class="member-pill locked paid-count" data-count="8">8人</button>
+    <div class="member-stepper">
+      <button class="stepper-btn" id="stepperMinus" disabled>−</button>
+      <div class="stepper-display"><span id="stepperCount">4</span><span class="stepper-unit">人</span></div>
+      <button class="stepper-btn" id="stepperPlus">＋</button>
     </div>
   </div>
   <div class="paid-toast" id="paidToast">有料版で利用できます</div>
@@ -2121,29 +2112,31 @@ ${text}`;
     if (confirm('すべての商品をクリアしますか？')) { items.length = 0; receiptTotal = 0; render(); }
   });
 
-  // 人数選択ピル（無料）
-  document.querySelectorAll('.member-pill:not(.locked)').forEach(pill => {
-    pill.addEventListener('click', () => {
-      memberCount = parseInt(pill.dataset.count);
-      MEMBERS = ALL_MEMBERS.slice(0, memberCount);
-      document.querySelectorAll('.member-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-    });
-  });
-
-  // 有料ピル: 展開トグル＋トースト
+  // 人数ステッパー
   let paidToastTimer = null;
   function showPaidToast() {
     clearTimeout(paidToastTimer);
     $('paidToast').classList.add('show');
     paidToastTimer = setTimeout(() => $('paidToast').classList.remove('show'), 2200);
   }
-  $('paidToggle').addEventListener('click', () => {
-    const exp = $('paidPillsExpanded');
-    exp.style.display = exp.style.display === 'none' ? 'flex' : 'none';
-    showPaidToast();
+  function updateStepper() {
+    $('stepperCount').textContent = memberCount;
+    $('stepperMinus').disabled = memberCount <= 2;
+    $('stepperPlus').textContent = memberCount >= FREE_MAX ? '🔒' : '＋';
+  }
+  $('stepperMinus').addEventListener('click', () => {
+    if (memberCount <= 2) return;
+    memberCount--;
+    MEMBERS = ALL_MEMBERS.slice(0, memberCount);
+    updateStepper();
   });
-  document.querySelectorAll('.paid-count').forEach(p => p.addEventListener('click', showPaidToast));
+  $('stepperPlus').addEventListener('click', () => {
+    if (memberCount >= FREE_MAX) { showPaidToast(); return; }
+    memberCount++;
+    MEMBERS = ALL_MEMBERS.slice(0, memberCount);
+    updateStepper();
+  });
+  updateStepper();
 
   // もどるボタン → スタート画面へ
   $('btnBack').addEventListener('click', () => showScreen('screen-start'));
