@@ -1376,7 +1376,7 @@
       <div class="empty-msg">商品を追加すると、ここに一覧が表示されます</div>
     </div>
 
-    <button class="btn-clear" id="btnClear">すべてクリア</button>
+
   </div>
 
   <!-- ===== 右カラム: 結果 ===== -->
@@ -1959,8 +1959,7 @@ ${text}`;
       return;
     }
 
-    const bulkBtn = `<button class="btn-all-split" onclick="setAllSplitAll()">全明細を全員で割り勘に設定</button>`;
-    $('itemList').innerHTML = bulkBtn + items.map(item => {
+    $('itemList').innerHTML = items.map(item => {
       let controls, priceBadge;
       const isOpen      = openItemIds.has(item.id);
       const isEditName  = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'name';
