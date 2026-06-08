@@ -1846,17 +1846,18 @@ ${text}`;
   };
 
   // 各メンバーの負担額を計算する。
-  // 個数割り当てモード（quantity > 1）: 割り当て個数×単価で按分、端数は先頭から1円加算。
-  // チェックモード: 1円未満の端数は先頭のメンバーから順に1円ずつ上乗せして完全に分配する。
+  // 端数の+1円は itemIdx でローテーションして分配する。同じ割り方のメンバー間で
+  // 何商品あっても最大差が1円に収まる。
   // チェックなし／個数未割り当ての場合は「自分」に全額を加算する。
-  function calcShares(item) {
+  function calcShares(item, itemIdx = 0) {
     const shares = {};
     MEMBERS.forEach(m => (shares[m.key] = 0));
 
     if (item.splitAll) {
-      const base = Math.floor(item.price / MEMBERS.length);
-      const rem  = item.price % MEMBERS.length;
-      MEMBERS.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
+      const base   = Math.floor(item.price / MEMBERS.length);
+      const rem    = item.price % MEMBERS.length;
+      const offset = itemIdx % MEMBERS.length;
+      MEMBERS.forEach((m, i) => { shares[m.key] = base + ((i + offset) % MEMBERS.length < rem ? 1 : 0); });
       return shares;
     }
 
@@ -1864,24 +1865,25 @@ ${text}`;
       const assigned = MEMBERS.filter(m => (item.qty?.[m.key] || 0) > 0);
       const totalAssigned = MEMBERS.reduce((s, m) => s + (item.qty?.[m.key] || 0), 0);
       if (totalAssigned === 0) return shares; // 未割り当て → 全員0（表では「-」表示）
-      // 個数に比例した金額を配分
       assigned.forEach(m => {
         shares[m.key] = Math.round(item.price * item.qty[m.key] / item.quantity);
       });
-      // 全量割り当て済みの場合のみ端数補正（合計がitem.priceと一致するよう）
       if (totalAssigned === item.quantity) {
-        const sum = assigned.reduce((s, m) => s + shares[m.key], 0);
-        let rem = item.price - sum;
-        for (const m of assigned) { if (rem <= 0) break; shares[m.key]++; rem--; }
+        const sum     = assigned.reduce((s, m) => s + shares[m.key], 0);
+        let rem       = item.price - sum;
+        const offset  = itemIdx % assigned.length;
+        const rotated = [...assigned.slice(offset), ...assigned.slice(0, offset)];
+        for (const m of rotated) { if (rem <= 0) break; shares[m.key]++; rem--; }
       }
       return shares;
     }
 
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) { shares.me = item.price; return shares; }
-    const base = Math.floor(item.price / sel.length);
-    const rem  = item.price % sel.length;
-    sel.forEach((m, i) => { shares[m.key] = base + (i < rem ? 1 : 0); });
+    const base   = Math.floor(item.price / sel.length);
+    const rem    = item.price % sel.length;
+    const offset = itemIdx % sel.length;
+    sel.forEach((m, i) => { shares[m.key] = base + ((i + offset) % sel.length < rem ? 1 : 0); });
     return shares;
   }
 
@@ -1896,25 +1898,25 @@ ${text}`;
    * @returns {{ finals, adjRow, warning }}
    */
   function calcSplitByReceipt(itemList, receiptTotal, payer = 'me') {
-    const keys         = MEMBERS.map(m => m.key);
-    const receiptItems = itemList.filter(it => it.fromReceipt);
-    const manualItems  = itemList.filter(it => !it.fromReceipt);
+    const keys = MEMBERS.map(m => m.key);
 
     // レシート商品の各人合計
     const receiptRaw = {};
     keys.forEach(k => (receiptRaw[k] = 0));
-    for (const item of receiptItems) {
-      const sh = calcShares(item);
+    itemList.forEach((item, idx) => {
+      if (!item.fromReceipt) return;
+      const sh = calcShares(item, idx);
       keys.forEach(k => (receiptRaw[k] += sh[k]));
-    }
+    });
 
     // 手動商品の各人合計
     const manualRaw = {};
     keys.forEach(k => (manualRaw[k] = 0));
-    for (const item of manualItems) {
-      const sh = calcShares(item);
+    itemList.forEach((item, idx) => {
+      if (item.fromReceipt) return;
+      const sh = calcShares(item, idx);
       keys.forEach(k => (manualRaw[k] += sh[k]));
-    }
+    });
 
     // 差額計算（レシート商品のみ）
     const receiptItemsTotal = keys.reduce((s, k) => s + receiptRaw[k], 0);
@@ -2072,8 +2074,8 @@ ${text}`;
     const rawTotals = {};
     MEMBERS.forEach(m => (rawTotals[m.key] = 0));
 
-    const rows = items.map(item => {
-      const sh = calcShares(item);
+    const rows = items.map((item, idx) => {
+      const sh = calcShares(item, idx);
       MEMBERS.forEach(m => (rawTotals[m.key] += sh[m.key]));
       const cells = MEMBERS.map(m => {
         const v = sh[m.key];
