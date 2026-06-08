@@ -294,6 +294,13 @@
       color: #706830;
       font-weight: 700;
     }
+    /* 全員 */
+    .pill input:checked + label.cl-all {
+      border-color: #E8707A;
+      background: #FFF0F0;
+      color: #C03040;
+      font-weight: 700;
+    }
 
     .split-note {
       font-size: 11px;
@@ -1564,18 +1571,21 @@
           console.log('[btnGoMain] 保存データ:', currentParsedResult);
           localStorage.setItem('currentParsedResult', JSON.stringify(currentParsedResult));
           items.length = 0; // 既存データをクリアしてOCR結果のみ反映
+          openItemIds.clear();
           receiptTotal = currentParsedResult.totalAmount || 0;
           currentParsedResult.items.forEach(it => {
             const checked = {};
             MEMBERS.forEach(m => (checked[m.key] = false));
             const qty = {};
             MEMBERS.forEach(m => (qty[m.key] = 0));
-            items.push({
+            const newItem = {
               id: Date.now() + (Math.random() * 1000 | 0),
               name: it.name, price: it.price,
               quantity: it.quantity || 1, unitPrice: it.unitPrice || null,
               checked, qty, fromReceipt: true, splitAll: false,
-            });
+            };
+            items.push(newItem);
+            openItemIds.add(newItem.id);
           });
           render();
           showScreen('screen-main');
@@ -1709,7 +1719,9 @@ ${text}`;
 
     const checked = {};
     MEMBERS.forEach(m => (checked[m.key] = false));
-    items.push({ id: Date.now(), name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false, splitAll: false });
+    const newId = Date.now();
+    items.push({ id: newId, name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false, splitAll: false });
+    openItemIds.add(newId);
 
     $('itemName').value  = '';
     $('itemPrice').value = '';
@@ -1733,6 +1745,14 @@ ${text}`;
     if (item) { item.checked[key] = !item.checked[key]; render(); }
   }
 
+  window.toggleMember = function(id, key) {
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+    item.splitAll = false;
+    item.checked[key] = !item.checked[key];
+    render();
+  };
+
   // ── インライン編集 ───────────────────────────────────────────
   let editingState = null; // { id, field: 'name' | 'price' }
   let openItemIds  = new Set(); // 展開中の商品カード id セット
@@ -1744,7 +1764,7 @@ ${text}`;
   };
 
   function startEdit(id, field) {
-    openItemIds.add(id); // カードを展開してから編集
+    openItemIds.add(id);
     editingState = { id, field };
     render();
   }
@@ -1925,8 +1945,6 @@ ${text}`;
     const bulkBtn = `<button class="btn-all-split" onclick="setAllSplitAll()">全明細を全員で割り勘に設定</button>`;
     $('itemList').innerHTML = bulkBtn + items.map(item => {
       let controls, priceBadge;
-      // qty>1 の商品は初回表示時に自動展開
-      if (item.quantity > 1) openItemIds.add(item.id);
       const isOpen      = openItemIds.has(item.id);
       const isEditName  = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'name';
       const isEditPrice = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'price';
@@ -1952,24 +1970,32 @@ ${text}`;
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
           : `<div class="qty-remaining">残り ${remaining}個</div>`;
-        const splitAllBtnQty = `<button class="btn-split-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">${item.splitAll ? '✓ 全員で割り勘中 — 個別に変更する' : '全員で均等割りにする'}</button>`;
-        controls = splitAllBtnQty + (!item.splitAll
+        const allUidQty = `c_${item.id}_all`;
+        const allPillQty = `<div class="checks" style="margin-top:8px"><span class="pill">`
+          + `<input type="checkbox" id="${allUidQty}" ${item.splitAll ? 'checked' : ''} onchange="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">`
+          + `<label for="${allUidQty}" class="cl-all">全員(${MEMBERS.length}人)</label>`
+          + `</span></div>`;
+        controls = (!item.splitAll
           ? remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`
-          : '');
+          : '') + allPillQty;
         priceBadge = `¥${item.price.toLocaleString()} `
           + `<span class="qty-unit-hint">(¥${item.unitPrice.toLocaleString()}×${item.quantity})</span>`;
       } else {
         // チェックボックスモード
-        const pills = MEMBERS.map(m => {
+        const memberPills = MEMBERS.map(m => {
           const uid = `c_${item.id}_${m.key}`;
-          const chk = item.checked[m.key] ? 'checked' : '';
+          const chk = (!item.splitAll && item.checked[m.key]) ? 'checked' : '';
           return `<span class="pill">`
-            + `<input type="checkbox" id="${uid}" ${chk} onchange="toggle(${item.id},'${m.key}')">`
+            + `<input type="checkbox" id="${uid}" ${chk} onchange="event.stopPropagation();toggleMember(${item.id},'${m.key}')">`
             + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
             + `</span>`;
         }).join('');
-        const splitAllBtnChk = `<button class="btn-split-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">${item.splitAll ? '✓ 全員で割り勘中 — 個別に変更する' : '全員で均等割りにする'}</button>`;
-        controls = splitAllBtnChk + (!item.splitAll ? `<div class="checks">${pills}</div>` : '');
+        const allUid = `c_${item.id}_all`;
+        const allPill = `<span class="pill">`
+          + `<input type="checkbox" id="${allUid}" ${item.splitAll ? 'checked' : ''} onchange="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">`
+          + `<label for="${allUid}" class="cl-all">全員(${MEMBERS.length}人)</label>`
+          + `</span>`;
+        controls = `<div class="checks">${memberPills}${allPill}</div>`;
         priceBadge = `¥${item.price.toLocaleString()}`;
       }
 
