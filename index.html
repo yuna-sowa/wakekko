@@ -1753,6 +1753,15 @@ ${text}`;
     render();
   };
 
+  window.toggleAll = function(id) {
+    const item = items.find(x => x.id === id);
+    if (!item) return;
+    const allChecked = MEMBERS.every(m => item.checked[m.key]);
+    MEMBERS.forEach(m => (item.checked[m.key] = !allChecked));
+    item.splitAll = false;
+    render();
+  };
+
   // ── インライン編集 ───────────────────────────────────────────
   let editingState = null; // { id, field: 'name' | 'price' }
   let openItemIds  = new Set(); // 展開中の商品カード id セット
@@ -1809,7 +1818,14 @@ ${text}`;
   };
 
   window.setAllSplitAll = function() {
-    items.forEach(item => { item.splitAll = true; });
+    items.forEach(item => {
+      if (item.quantity > 1) {
+        item.splitAll = true;
+      } else {
+        MEMBERS.forEach(m => (item.checked[m.key] = true));
+        item.splitAll = false;
+      }
+    });
     render();
   };
 
@@ -1932,6 +1948,7 @@ ${text}`;
     }
     const sel = MEMBERS.filter(m => item.checked[m.key]);
     if (sel.length === 0) return '<b>自分に全額加算</b>';
+    if (sel.length === MEMBERS.length) return `全員 (${MEMBERS.length}人) で <b>均等割り</b>`;
     return `${sel.map(m => m.label).join(' + ')} で <b>${sel.length}人割り</b>`;
   }
 
@@ -1984,15 +2001,16 @@ ${text}`;
         // チェックボックスモード
         const memberPills = MEMBERS.map(m => {
           const uid = `c_${item.id}_${m.key}`;
-          const chk = (!item.splitAll && item.checked[m.key]) ? 'checked' : '';
+          const chk = item.checked[m.key] ? 'checked' : '';
           return `<span class="pill">`
             + `<input type="checkbox" id="${uid}" ${chk} onchange="event.stopPropagation();toggleMember(${item.id},'${m.key}')">`
             + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
             + `</span>`;
         }).join('');
         const allUid = `c_${item.id}_all`;
+        const allChecked = MEMBERS.every(m => item.checked[m.key]);
         const allPill = `<span class="pill">`
-          + `<input type="checkbox" id="${allUid}" ${item.splitAll ? 'checked' : ''} onchange="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">`
+          + `<input type="checkbox" id="${allUid}" ${allChecked ? 'checked' : ''} onchange="event.stopPropagation();toggleAll(${item.id})">`
           + `<label for="${allUid}" class="cl-all">全員(${MEMBERS.length}人)</label>`
           + `</span>`;
         controls = `<div class="checks">${memberPills}${allPill}</div>`;
