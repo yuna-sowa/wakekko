@@ -167,17 +167,16 @@
       gap: 6px;
       flex-shrink: 0;
     }
-    .expand-chevron {
-      font-size: 10px;
-      color: #ccc;
-      line-height: 1;
+    .btn-all {
+      width: 100%; margin-top: 8px;
+      padding: 6px 14px;
+      background: #FFF5F5; border: 1.5px dashed #F0C0C8; border-radius: 20px;
+      font-size: 12px; font-weight: 600; color: #C88088;
+      cursor: pointer; font-family: inherit; text-align: center;
     }
-    .split-note-compact {
-      font-size: 11px;
-      color: #bbb;
-      margin-top: 6px;
+    .btn-all.active {
+      background: #FFE8E8; border-style: solid; border-color: #E8909A; color: #A85060;
     }
-    .split-note-compact b { color: #E8707A; }
     .item-name {
       font-size: 14px;
       font-weight: 700;
@@ -1577,7 +1576,6 @@
           console.log('[btnGoMain] 保存データ:', currentParsedResult);
           localStorage.setItem('currentParsedResult', JSON.stringify(currentParsedResult));
           items.length = 0; // 既存データをクリアしてOCR結果のみ反映
-          openItemIds.clear();
           receiptTotal = currentParsedResult.totalAmount || 0;
           currentParsedResult.items.forEach(it => {
             const checked = {};
@@ -1591,7 +1589,6 @@
               checked, qty, fromReceipt: true, splitAll: false, useQtyMode: false,
             };
             items.push(newItem);
-            openItemIds.add(newItem.id);
           });
           render();
           showScreen('screen-main');
@@ -1743,7 +1740,6 @@ ${text}`;
     MEMBERS.forEach(m => (checked[m.key] = false));
     const newId = Date.now();
     items.push({ id: newId, name, price, quantity: 1, unitPrice: null, checked, qty: {}, fromReceipt: false, splitAll: false, useQtyMode: false });
-    openItemIds.add(newId);
 
     $('itemName').value  = '';
     $('itemPrice').value = '';
@@ -1758,7 +1754,6 @@ ${text}`;
     if (item.fromReceipt) receiptTotal = Math.max(0, receiptTotal - item.price);
     items.splice(i, 1);
     if (editingState?.id === id) editingState = null;
-    openItemIds.delete(id);
     render();
   }
 
@@ -1786,16 +1781,8 @@ ${text}`;
 
   // ── インライン編集 ───────────────────────────────────────────
   let editingState = null; // { id, field: 'name' | 'price' }
-  let openItemIds  = new Set(); // 展開中の商品カード id セット
-
-  window.toggleItem = function(id) {
-    if (openItemIds.has(id)) openItemIds.delete(id);
-    else openItemIds.add(id);
-    render();
-  };
 
   function startEdit(id, field) {
-    openItemIds.add(id);
     editingState = { id, field };
     render();
   }
@@ -1990,7 +1977,6 @@ ${text}`;
 
     $('itemList').innerHTML = items.map(item => {
       let controls, priceBadge;
-      const isOpen      = openItemIds.has(item.id);
       const isEditName  = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'name';
       const isEditPrice = item.fromReceipt && editingState?.id === item.id && editingState?.field === 'price';
 
@@ -2020,15 +2006,11 @@ ${text}`;
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
           : `<div class="qty-remaining">残り ${remaining}個</div>`;
-        const allUidQty = `c_${item.id}_all`;
-        const allPillQty = `<div class="checks" style="margin-top:8px"><span class="pill">`
-          + `<input type="checkbox" id="${allUidQty}" ${item.splitAll ? 'checked' : ''} onchange="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">`
-          + `<label for="${allUidQty}" class="cl-all">全員(${MEMBERS.length}人)</label>`
-          + `</span></div>`;
+        const allBtn = `<button class="btn-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">全員(${MEMBERS.length}人)で均等割り</button>`;
         const backBtn = `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},false)">← チェックに切り替え</button></div>`;
         controls = (!item.splitAll
           ? remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`
-          : '') + allPillQty + backBtn;
+          : '') + allBtn + backBtn;
       } else {
         // チェックモード（1個・複数個共通）
         const memberPills = MEMBERS.map(m => {
@@ -2039,48 +2021,41 @@ ${text}`;
             + `<label for="${uid}" class="${m.cl}">${esc(m.label)}</label>`
             + `</span>`;
         }).join('');
-        const allUid = `c_${item.id}_all`;
         const allChecked = MEMBERS.every(m => item.checked[m.key]);
-        const allPill = `<span class="pill">`
-          + `<input type="checkbox" id="${allUid}" ${allChecked ? 'checked' : ''} onchange="event.stopPropagation();toggleAll(${item.id})">`
-          + `<label for="${allUid}" class="cl-all">全員(${MEMBERS.length}人)</label>`
-          + `</span>`;
+        const allBtn = `<button class="btn-all${allChecked ? ' active' : ''}" onclick="event.stopPropagation();toggleAll(${item.id})">全員(${MEMBERS.length}人)で均等割り</button>`;
         const qtyModeBtn = item.quantity > 1
           ? `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},true)">個数を指定する</button></div>`
           : '';
-        controls = `<div class="checks">${memberPills}${allPill}</div>${qtyModeBtn}`;
+        controls = `<div class="checks">${memberPills}</div>${allBtn}${qtyModeBtn}`;
       }
 
-      // 商品名 HTML（レシート商品は展開時のみ編集可）
+      // 商品名 HTML（レシート商品は常に編集可）
       const nameHtml = isEditName
         ? `<input class="edit-input edit-input-focus" type="text" value="${esc(item.name)}"
              onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'name',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'name',this.value)">`
-        : `<div class="item-name${(item.fromReceipt && isOpen) ? ' editable-field' : ''}"${(item.fromReceipt && isOpen) ? ` onclick="event.stopPropagation();startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${(item.fromReceipt && isOpen) ? '<span class="edit-icon">✎</span>' : ''}</div>`;
+        : `<div class="item-name${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'name')"` : ''}>${esc(item.name)}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</div>`;
 
-      // 価格バッジ HTML（レシート商品は展開時のみ編集可）
+      // 価格バッジ HTML（レシート商品は常に編集可）
       const badgeHtml = isEditPrice
         ? `<span class="item-price-badge"><input class="edit-input edit-price-input edit-input-focus" type="number" value="${item.price}" min="1"
              onclick="event.stopPropagation()"
              onkeydown="if(event.key==='Enter'){event.preventDefault();saveEdit(${item.id},'price',this.value)}else if(event.key==='Escape'){cancelEdit()}"
              onblur="saveEdit(${item.id},'price',this.value)"></span>`
-        : `<span class="item-price-badge${(item.fromReceipt && isOpen) ? ' editable-field' : ''}"${(item.fromReceipt && isOpen) ? ` onclick="event.stopPropagation();startEdit(${item.id},'price')"` : ''}>${priceBadge}${(item.fromReceipt && isOpen) ? '<span class="edit-icon">✎</span>' : ''}</span>`;
+        : `<span class="item-price-badge${item.fromReceipt ? ' editable-field' : ''}"${item.fromReceipt ? ` onclick="event.stopPropagation();startEdit(${item.id},'price')"` : ''}>${priceBadge}${item.fromReceipt ? '<span class="edit-icon">✎</span>' : ''}</span>`;
 
-      return `<div class="item-card${isOpen ? ' open' : ''}" onclick="toggleItem(${item.id})">`
+      return `<div class="item-card open">`
         + `<div class="item-top">`
         +   `<div>`
         +     nameHtml
         +     badgeHtml
         +   `</div>`
         +   `<div class="item-top-actions">`
-        +     `<span class="expand-chevron">${isOpen ? '▲' : '▼'}</span>`
         +     `<button class="btn-del" onclick="event.stopPropagation();deleteItem(${item.id})" title="削除">&times;</button>`
         +   `</div>`
         + `</div>`
-        + (isOpen
-            ? `<div class="item-controls" onclick="event.stopPropagation()">${controls}<div class="split-note">${hint(item)}</div></div>`
-            : `<div class="split-note-compact">${hint(item)}</div>`)
+        + `<div class="item-controls" onclick="event.stopPropagation()">${controls}<div class="split-note">${hint(item)}</div></div>`
         + `</div>`;
     }).join('');
 
