@@ -2165,12 +2165,6 @@ ${text}`;
   $('itemPrice').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } });
   $('itemName').addEventListener('keydown',  e => { if (e.key === 'Enter') { e.preventDefault(); $('itemPrice').focus(); } });
 
-  // 全商品クリア（確認ダイアログあり）
-  $('btnClear').addEventListener('click', () => {
-    if (items.length === 0) return;
-    if (confirm('すべての商品をクリアしますか？')) { items.length = 0; receiptTotal = 0; render(); }
-  });
-
   // 人数ステッパー
   let paidToastTimer = null;
   function showPaidToast() {
