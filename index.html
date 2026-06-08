@@ -1521,8 +1521,8 @@ ${text}`;
           if (quantity > 1) {
             if (rawUnit > 0) {
               unitPrice = rawUnit;
-              // price が単価と一致する or unitPrice*quantity の方が大きいなら合計に補正
-              price = (rawPrice === rawUnit || rawPrice < rawUnit * quantity) ? rawUnit * quantity : rawPrice;
+              // price が単価と一致する場合のみ合計に補正（AIが単価を返したケース）
+              price = rawPrice === rawUnit ? rawUnit * quantity : rawPrice;
             } else {
               unitPrice = Math.round(rawPrice / quantity);
             }
