@@ -2006,11 +2006,8 @@ ${text}`;
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
           : `<div class="qty-remaining">残り ${remaining}個</div>`;
-        const allBtn = `<button class="btn-all${item.splitAll ? ' active' : ''}" onclick="event.stopPropagation();setSplitAll(${item.id},${!item.splitAll})">全員(${MEMBERS.length}人)で均等割り</button>`;
         const backBtn = `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},false)">← チェックに切り替え</button></div>`;
-        controls = (!item.splitAll
-          ? remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + `<div class="qty-total-hint">合計 ${totalAssigned} / ${item.quantity}個</div>`
-          : '') + allBtn + backBtn;
+        controls = remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + backBtn;
       } else {
         // チェックモード（1個・複数個共通）
         const memberPills = MEMBERS.map(m => {
