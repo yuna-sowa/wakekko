@@ -2006,7 +2006,7 @@ ${text}`;
         const remainingLabel = complete
           ? `<div class="qty-remaining complete">✓ 全${item.quantity}個を割り当て済み</div>`
           : `<div class="qty-remaining">残り ${remaining}個</div>`;
-        const backBtn = `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},false)">← チェックに切り替え</button></div>`;
+        const backBtn = `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},false)">個数指定をやめる</button></div>`;
         controls = remainingLabel + `<div class="qty-checks">${qtyRows}</div>` + backBtn;
       } else {
         // チェックモード（1個・複数個共通）
@@ -2019,9 +2019,9 @@ ${text}`;
             + `</span>`;
         }).join('');
         const allChecked = MEMBERS.every(m => item.checked[m.key]);
-        const allBtn = `<button class="btn-all${allChecked ? ' active' : ''}" onclick="event.stopPropagation();toggleAll(${item.id})">全員(${MEMBERS.length}人)で均等割り</button>`;
+        const allBtn = `<button class="btn-all${allChecked ? ' active' : ''}" onclick="event.stopPropagation();toggleAll(${item.id})">みんなで割る（${MEMBERS.length}人）</button>`;
         const qtyModeBtn = item.quantity > 1
-          ? `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},true)">個数を指定する</button></div>`
+          ? `<div style="margin-top:8px"><button class="qty-mode-btn" onclick="event.stopPropagation();setQtyMode(${item.id},true)">個数を振り分ける</button></div>`
           : '';
         controls = `<div class="checks">${memberPills}</div>${allBtn}${qtyModeBtn}`;
       }
