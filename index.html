@@ -1697,11 +1697,25 @@ ${text}`;
       totalAmount: Number(parsed.totalAmount) || 0,
       items: (parsed.items ?? [])
         .map(it => {
-          const quantity = Number(it.quantity) || 1;
-          const unitPrice = quantity > 1 ? (Number(it.unitPrice) || Math.round(Number(it.price) / quantity)) : null;
+          const quantity  = Number(it.quantity)  || 1;
+          const rawPrice  = Number(it.price)     || 0;
+          const rawUnit   = Number(it.unitPrice) || 0;
+          // AIが単価を price として返すケースを補正:
+          // unitPrice が設定済みで price が単価と等しい（＝合計未計算）なら price を再計算
+          let price = rawPrice;
+          let unitPrice = null;
+          if (quantity > 1) {
+            if (rawUnit > 0) {
+              unitPrice = rawUnit;
+              // price が単価と一致する or unitPrice*quantity の方が大きいなら合計に補正
+              price = (rawPrice === rawUnit || rawPrice < rawUnit * quantity) ? rawUnit * quantity : rawPrice;
+            } else {
+              unitPrice = Math.round(rawPrice / quantity);
+            }
+          }
           return {
             name:      String(it.name ?? '').trim(),
-            price:     Number(it.price) || 0,
+            price,
             quantity:  quantity > 1 ? quantity : 1,
             unitPrice: quantity > 1 ? unitPrice : null,
           };
