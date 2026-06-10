@@ -161,12 +161,6 @@
       margin-bottom: 14px;
     }
     .item-top > div:first-child { min-width: 0; flex: 1; }
-    .item-top-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
     .btn-all {
       width: 100%; margin-top: 8px;
       padding: 6px 14px;
@@ -196,6 +190,11 @@
       padding: 4px 14px;
       border-radius: 10px;
       margin-top: 6px;
+    }
+    .item-del-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
     }
     .btn-del {
       background: #FFF5F5;
@@ -2048,11 +2047,8 @@ ${text}`;
         +     nameHtml
         +     badgeHtml
         +   `</div>`
-        +   `<div class="item-top-actions">`
-        +     `<button class="btn-del" onclick="event.stopPropagation();deleteItem(${item.id})" title="削除">&times;</button>`
-        +   `</div>`
         + `</div>`
-        + `<div class="item-controls" onclick="event.stopPropagation()">${controls}<div class="split-note">${hint(item)}</div></div>`
+        + `<div class="item-controls" onclick="event.stopPropagation()">${controls}<div class="split-note">${hint(item)}</div><div class="item-del-row"><button class="btn-del" onclick="event.stopPropagation();deleteItem(${item.id})" title="削除">&times;</button></div></div>`
         + `</div>`;
     }).join('');
 
