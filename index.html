@@ -1055,6 +1055,117 @@
       50%       { transform: translateY(-10px); }
     }
 
+    /* ========== 履歴画面 ========== */
+    #screen-history {
+      min-height: 100vh;
+      background: #FFF5F5;
+      display: none;
+      flex-direction: column;
+    }
+    .history-header {
+      display: flex;
+      align-items: center;
+      padding: 20px 20px 0;
+      position: relative;
+      min-height: 52px;
+      flex-shrink: 0;
+    }
+    .history-page-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 13px;
+      font-weight: 700;
+      color: #7A5C48;
+      letter-spacing: 2.5px;
+    }
+    .history-body {
+      flex: 1;
+      padding: 20px 24px 56px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .history-empty {
+      text-align: center;
+      padding: 60px 0;
+      color: #C8B8B0;
+      font-size: 13px;
+      letter-spacing: 1px;
+      line-height: 2.2;
+    }
+    .history-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px 22px;
+      box-shadow: 0 2px 10px rgba(200,100,100,0.06);
+    }
+    .h-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .h-date {
+      font-size: 10px;
+      color: #B8A8A0;
+      letter-spacing: 1px;
+    }
+    .h-total {
+      font-size: 20px;
+      font-weight: 900;
+      color: #E8707A;
+    }
+    .h-store {
+      font-size: 13px;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 14px;
+    }
+    .h-items {
+      border-top: 1px solid #FFE8E8;
+      padding-top: 12px;
+      margin-bottom: 16px;
+    }
+    .h-item-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #8A7060;
+      margin-bottom: 5px;
+    }
+    .h-item-name {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: 12px;
+    }
+    .h-item-price { font-weight: 700; color: #5A4A40; flex-shrink: 0; }
+    .h-item-more {
+      font-size: 11px;
+      color: #B8A8A0;
+      margin-top: 4px;
+    }
+    .h-restore-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(145deg, #D4703E 0%, #C9673A 55%, #BE5D32 100%);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .h-restore-btn:active { opacity: 0.8; }
+
     /* ========== レシート読み込み画面 ========== */
     #screen-upload {
       min-height: 100vh;
@@ -1359,6 +1470,15 @@
   <input type="file" id="captureInput" accept="image/*" capture="environment" style="display:none">
 </div>
 
+<!-- ========== 履歴画面 ========== -->
+<div id="screen-history">
+  <div class="history-header">
+    <button class="btn-back" id="btnHistoryBack">← もどる</button>
+    <div class="history-page-title">履歴</div>
+  </div>
+  <div class="history-body" id="historyBody"></div>
+</div>
+
 <!-- ========== レシート読み込み画面 ========== -->
 <div id="screen-upload">
   <div class="upload-header">
@@ -1486,12 +1606,12 @@
 
   // ── 画面切替 ──────────────────────────────────────────────────
   function showScreen(id) {
-    ['screen-start', 'screen-upload', 'screen-main', 'screen-camera'].forEach(s => {
+    ['screen-start', 'screen-upload', 'screen-main', 'screen-camera', 'screen-history'].forEach(s => {
       const el = $(s);
       if (el) el.style.display = 'none';
     });
     const target = $(id);
-    if (target) target.style.display = ['screen-start', 'screen-upload', 'screen-camera'].includes(id) ? 'flex' : 'block';
+    if (target) target.style.display = ['screen-start', 'screen-upload', 'screen-camera', 'screen-history'].includes(id) ? 'flex' : 'block';
   }
 
   // ── OCR ──────────────────────────────────────────────────────
@@ -1617,6 +1737,7 @@
         btnGoMain.onclick = () => {
           console.log('[btnGoMain] 保存データ:', currentParsedResult);
           localStorage.setItem('currentParsedResult', JSON.stringify(currentParsedResult));
+          saveToHistory(currentParsedResult);
           items.length = 0; // 既存データをクリアしてOCR結果のみ反映
           receiptTotal = currentParsedResult.totalAmount || 0;
           currentParsedResult.items.forEach(it => {
@@ -2224,6 +2345,89 @@ ${text}`;
     updateStepper();
   });
   updateStepper();
+
+  // ── 履歴 ──────────────────────────────────────────────────────
+  const HISTORY_KEY = 'wakekko_history';
+  const HISTORY_MAX = 3;
+
+  function saveToHistory(result) {
+    if (!result || !result.items || result.items.length === 0) return;
+    const history = loadHistory();
+    history.unshift({
+      id: Date.now(),
+      date: new Date().toISOString(),
+      storeName: result.storeName || '',
+      totalAmount: result.totalAmount || 0,
+      items: result.items.map(it => ({ name: it.name, price: it.price, quantity: it.quantity || 1 })),
+    });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, HISTORY_MAX)));
+  }
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+  }
+
+  function formatHistoryDate(iso) {
+    const d = new Date(iso);
+    const diff = (Date.now() - d) / 1000;
+    if (diff < 60)    return 'たった今';
+    if (diff < 3600)  return `${Math.floor(diff / 60)}分前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
+    const days = Math.floor(diff / 86400);
+    if (days < 7)     return `${days}日前`;
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function renderHistory() {
+    const history = loadHistory();
+    const body = $('historyBody');
+    if (history.length === 0) {
+      body.innerHTML = '<div class="history-empty">まだ履歴がありません<br>レシートを読み込むと<br>ここに表示されます</div>';
+      return;
+    }
+    body.innerHTML = history.map((entry, i) => {
+      const preview = entry.items.slice(0, 3)
+        .map(it => `<div class="h-item-row"><span class="h-item-name">${esc(it.name)}</span><span class="h-item-price">¥${it.price.toLocaleString()}</span></div>`)
+        .join('');
+      const more = entry.items.length > 3
+        ? `<div class="h-item-more">他 ${entry.items.length - 3} 品</div>` : '';
+      return `
+        <div class="history-card">
+          <div class="h-meta">
+            <span class="h-date">${formatHistoryDate(entry.date)}</span>
+            <span class="h-total">¥${entry.totalAmount.toLocaleString()}</span>
+          </div>
+          <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
+          <div class="h-items">${preview}${more}</div>
+          <button class="h-restore-btn" onclick="restoreHistory(${i})">この内容で割り勘する →</button>
+        </div>`;
+    }).join('');
+  }
+
+  window.restoreHistory = function(idx) {
+    const entry = loadHistory()[idx];
+    if (!entry) return;
+    items.length = 0;
+    receiptTotal = entry.totalAmount || 0;
+    entry.items.forEach(it => {
+      const checked = {}, qty = {};
+      MEMBERS.forEach(m => { checked[m.key] = false; qty[m.key] = 0; });
+      items.push({
+        id: Date.now() + (Math.random() * 1000 | 0),
+        name: it.name, price: it.price,
+        quantity: it.quantity || 1, unitPrice: null,
+        checked, qty, fromReceipt: true, splitAll: false, useQtyMode: false,
+      });
+    });
+    render();
+    showScreen('screen-main');
+  };
+
+  $('btnHistory').addEventListener('click', () => {
+    renderHistory();
+    showScreen('screen-history');
+  });
+  $('btnHistoryBack').addEventListener('click', () => showScreen('screen-start'));
 
   // もどるボタン → スタート画面へ
   $('btnBack').addEventListener('click', () => showScreen('screen-start'));
