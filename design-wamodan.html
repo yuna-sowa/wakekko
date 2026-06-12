@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>わけっこ — 和モダンデザインモック</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #F5F0EB;
+      --card:     #FFFFFF;
+      --accent:   #D4714E;
+      --acc-pale: #FAF0EC;
+      --acc-mid:  #EEC4B2;
+      --text-1:   #26201C;
+      --text-2:   #7A706A;
+      --text-3:   #B8AFA8;
+      --btn:      #EDEAE6;
+      --btn-h:    #E4E0DB;
+      --border:   #EAE4DE;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      background: #DDD8D2;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 48px 0;
+      font-family: 'M PLUS Rounded 1c', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Phone shell ── */
+    .phone {
+      width: 358px;
+      min-height: 780px;
+      background: var(--bg);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      outline: 1px solid rgba(0,0,0,0.07);
+      display: flex;
+      flex-direction: column;
+    }
+    .notch {
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 100px; height: 28px;
+      background: #18120E;
+      border-radius: 0 0 16px 16px;
+      z-index: 10;
+    }
+
+    /* ── Status bar ── */
+    .status {
+      height: 52px;
+      padding: 16px 30px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .st-time {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--text-1);
+      letter-spacing: 0.3px;
+    }
+    .st-icons { display: flex; gap: 5px; align-items: center; }
+
+    /* ── App header ── */
+    .app-header {
+      padding: 8px 28px 26px;
+      flex-shrink: 0;
+    }
+    .app-ruby {
+      font-size: 10px;
+      font-weight: 300;
+      letter-spacing: 3px;
+      color: var(--text-3);
+      margin-bottom: 5px;
+    }
+    .app-name {
+      font-size: 40px;
+      font-weight: 300;
+      color: var(--text-1);
+      letter-spacing: 10px;
+      text-indent: 10px;
+      line-height: 1;
+    }
+    .app-name-em { color: var(--accent); }
+    .app-sub {
+      font-size: 11px;
+      font-weight: 300;
+      color: var(--text-2);
+      letter-spacing: 0.5px;
+      line-height: 1.9;
+      margin-top: 6px;
+    }
+
+    /* ── Scroll body ── */
+    .scroll {
+      flex: 1;
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    /* ── Card base (NO shadow) ── */
+    .card {
+      background: var(--card);
+      border-radius: 28px;
+    }
+
+    /* ── Hero card (tappable) ── */
+    .hero-card {
+      padding: 32px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.12s;
+      user-select: none;
+    }
+    .hero-card:active { transform: scale(0.975); }
+
+    .illust { margin-bottom: 20px; }
+
+    .hero-label {
+      font-size: 17px;
+      font-weight: 500;
+      color: var(--accent);
+      text-align: center;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .hero-tap-hint {
+      font-size: 11px;
+      font-weight: 300;
+      color: var(--text-3);
+      text-align: center;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: center;
+    }
+    .hero-tap-hint svg { flex-shrink: 0; }
+
+    /* ── People card ── */
+    .ppl-card { padding: 22px 22px 18px; }
+    .card-tag {
+      font-size: 9.5px;
+      font-weight: 400;
+      color: var(--accent);
+      letter-spacing: 3px;
+      margin-bottom: 16px;
+    }
+    .stepper-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .s-btn {
+      width: 50px; height: 50px;
+      background: var(--btn);
+      border: none;
+      border-radius: 15px;
+      font-size: 24px;
+      font-weight: 300;
+      color: var(--text-1);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+      flex-shrink: 0;
+      transition: background 0.12s;
+      line-height: 1;
+    }
+    .s-btn:disabled { color: var(--text-3); cursor: default; }
+    .s-btn:not(:disabled):active { background: var(--btn-h); }
+    .s-center { flex: 1; text-align: center; }
+    .s-num {
+      font-size: 52px;
+      font-weight: 300;
+      color: var(--text-1);
+      line-height: 1;
+      letter-spacing: -2px;
+      display: inline;
+    }
+    .s-unit {
+      font-size: 14px;
+      font-weight: 300;
+      color: var(--text-2);
+      margin-left: 2px;
+    }
+    /* ── Sub-links card ── */
+    .sub-links { overflow: hidden; }
+    .sub-row {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 16px 20px;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.1s;
+    }
+    .sub-row:active { background: #FAF7F4; }
+    .sub-ic {
+      width: 34px; height: 34px;
+      background: var(--btn);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .sub-text-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sub-text {
+      font-size: 13px;
+      font-weight: 300;
+      color: var(--text-1);
+      letter-spacing: 0.3px;
+    }
+    .sub-text-hint {
+      font-size: 10px;
+      font-weight: 300;
+      color: var(--text-3);
+      letter-spacing: 0.3px;
+    }
+    .sub-arrow {
+      font-size: 16px;
+      color: var(--text-3);
+      line-height: 1;
+      font-weight: 300;
+    }
+    .sub-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 20px;
+    }
+
+    /* ── Bottom nav ── */
+    .bot-nav {
+      background: var(--card);
+      border-radius: 26px 26px 0 0;
+      padding: 14px 0 32px;
+      display: flex;
+      margin-top: 20px;
+      flex-shrink: 0;
+    }
+    .tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 0;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab:active { opacity: 0.6; }
+    .tab-label {
+      font-size: 10px;
+      font-weight: 400;
+      color: var(--text-3);
+      letter-spacing: 1.5px;
+    }
+    .tab.active .tab-label { color: var(--accent); }
+
+    /* ── CTA ── */
+    .cta-row {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-main {
+      flex: 1;
+      height: 56px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s;
+    }
+    .btn-main:active { opacity: 0.82; }
+    .btn-hist {
+      flex: 0 0 76px;
+      height: 56px;
+      background: var(--btn);
+      color: var(--text-1);
+      border: none;
+      border-radius: 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.12s;
+    }
+    .btn-hist:active { background: var(--btn-h); }
+    .btn-hist-icon { font-size: 17px; line-height: 1; }
+    .btn-hist-label { font-size: 10px; color: var(--text-2); letter-spacing: 1px; }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .status     { animation: fadeUp .4s .00s ease both; }
+    .app-header { animation: fadeUp .4s .05s ease both; }
+    .scroll > *:nth-child(1) { animation: fadeUp .4s .10s ease both; }
+    .scroll > *:nth-child(2) { animation: fadeUp .4s .16s ease both; }
+    .scroll > *:nth-child(3) { animation: fadeUp .4s .22s ease both; }
+    .bot-nav    { animation: fadeUp .4s .28s ease both; }
+  </style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+
+  <!-- Hidden camera input -->
+  <input type="file" id="camInput" accept="image/*" capture="environment" style="display:none" onchange="onPhoto(this)">
+
+  <!-- Status bar -->
+  <div class="status">
+    <span class="st-time">9:41</span>
+    <div class="st-icons">
+      <svg width="17" height="12" viewBox="0 0 17 12" fill="none">
+        <rect x="0"   y="6.5" width="3"   height="5.5" rx="1" fill="#26201C"/>
+        <rect x="4.7" y="4.5" width="3"   height="7.5" rx="1" fill="#26201C"/>
+        <rect x="9.4" y="2"   width="3"   height="10"  rx="1" fill="#26201C"/>
+        <rect x="14"  y="0"   width="3"   height="12"  rx="1" fill="#26201C"/>
+      </svg>
+      <svg width="15" height="11" viewBox="0 0 22 16" fill="none" stroke="#26201C" stroke-width="2.2" stroke-linecap="round">
+        <path d="M1 5.5C5.8.7 16.2.7 21 5.5"/>
+        <path d="M4 8.5c3.5-3.5 11-3.5 14 0"/>
+        <path d="M7.5 11.5c2-2 5-2 7 0"/>
+        <circle cx="11" cy="14.5" r="1.5" fill="#26201C" stroke="none"/>
+      </svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none">
+        <rect x=".75" y=".75" width="21.5" height="10.5" rx="3" stroke="#26201C" stroke-width="1.5"/>
+        <rect x="2.5" y="2.5" width="16"   height="7"   rx="1.5" fill="#26201C"/>
+        <path d="M23.5 4v4" stroke="#26201C" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- App header -->
+  <div class="app-header">
+    <div class="app-name">わけ<span class="app-name-em">っ</span>こ</div>
+    <div class="app-sub">レシートを読み込むだけで<br>簡単に割り勘</div>
+  </div>
+
+  <!-- Scroll body -->
+  <div class="scroll">
+
+    <!-- Hero card: tappable, triggers camera -->
+    <div class="card hero-card" onclick="triggerCamera()">
+      <div class="illust">
+        <!--
+          Illustration: receipt seen through a camera viewfinder
+          - Faded receipt in the background
+          - Prominent viewfinder corner brackets
+          - Focus ring at center
+        -->
+        <svg width="148" height="148" viewBox="0 0 148 148" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+          <!-- Circle background (receipt color) -->
+          <circle cx="74" cy="74" r="52" fill="#F2C4A4"/>
+
+          <!-- Receipt (white, smaller, inside circle) -->
+          <rect x="47" y="40" width="54" height="66" rx="4" fill="#FFFFFF" stroke="#D4C0B0" stroke-width="0.8"/>
+          <!-- Serrated top -->
+          <path d="M47 40 Q50 35 53 40 Q56 35 59 40 Q62 35 65 40 Q68 35 71 40 Q74 35 77 40 Q80 35 83 40 Q86 35 89 40 Q92 35 95 40 Q98 35 101 40"
+                stroke="#D4C0B0" stroke-width="1" stroke-linecap="round" fill="none"/>
+          <!-- Divider under header -->
+          <line x1="50" y1="53" x2="98" y2="53" stroke="#EDD8C4" stroke-width="0.7"/>
+          <!-- Item lines -->
+          <line x1="52" y1="62" x2="76" y2="62" stroke="#D4A898" stroke-width="0.9" opacity="0.8"/>
+          <line x1="52" y1="71" x2="72" y2="71" stroke="#D4A898" stroke-width="0.9" opacity="0.8"/>
+          <line x1="52" y1="80" x2="75" y2="80" stroke="#D4A898" stroke-width="0.9" opacity="0.8"/>
+          <!-- Price dots -->
+          <circle cx="92" cy="62" r="1.5" fill="#D4714E" opacity="0.65"/>
+          <circle cx="92" cy="71" r="1.5" fill="#D4714E" opacity="0.65"/>
+          <circle cx="92" cy="80" r="1.5" fill="#D4714E" opacity="0.65"/>
+          <!-- Dashed divider -->
+          <line x1="50" y1="89" x2="98" y2="89" stroke="#EDD8C4" stroke-width="0.7" stroke-dasharray="2.5 2"/>
+          <!-- Total line -->
+          <line x1="52" y1="99" x2="96" y2="99" stroke="#D4714E" stroke-width="1.5" opacity="0.7"/>
+
+          <!-- Camera viewfinder corners (outside circle) -->
+          <g stroke="#D4714E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.72">
+            <path d="M14 30 L14 14 L30 14"/>
+            <path d="M118 14 L134 14 L134 30"/>
+            <path d="M14 118 L14 134 L30 134"/>
+            <path d="M118 134 L134 134 L134 118"/>
+          </g>
+        </svg>
+      </div>
+
+    </div>
+
+    <!-- CTA buttons -->
+    <div class="cta-row">
+      <button class="btn-main" onclick="triggerCamera()">
+        <svg width="14" height="17" viewBox="0 0 14 17" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 1h12v14l-1.5-1.2-2 1.5-2-1.5-2 1.5-1.5-1.2L1 15V1z"/>
+          <line x1="3.5" y1="5.5" x2="10.5" y2="5.5"/>
+          <line x1="3.5" y1="8.5" x2="8.5"  y2="8.5"/>
+        </svg>
+        レシートを読み込む
+      </button>
+      <button class="btn-hist">
+        <svg class="btn-hist-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="8.5"/>
+          <path d="M10 6v4l2.5 2.5"/>
+        </svg>
+        <span class="btn-hist-label">履歴</span>
+      </button>
+    </div>
+
+    <!-- People count card -->
+    <div class="card ppl-card">
+      <div class="card-tag">人数を選ぶ</div>
+      <div class="stepper-row">
+        <button class="s-btn" id="btnM" onclick="ch(-1)">−</button>
+        <div class="s-center">
+          <span class="s-num" id="nv">3</span><span class="s-unit">人</span>
+        </div>
+        <button class="s-btn" id="btnP" onclick="ch(+1)">＋</button>
+      </div>
+    </div>
+
+    <!-- Sub-links card -->
+    <div class="card sub-links">
+      <div class="sub-row" onclick="">
+        <div class="sub-ic">
+          <!-- Receipt icon -->
+          <svg width="16" height="19" viewBox="0 0 16 19" fill="none" stroke="#7A706A" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 1h14v16l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5V1z"/>
+            <line x1="4" y1="6"  x2="12" y2="6"/>
+            <line x1="4" y1="10" x2="10" y2="10"/>
+            <line x1="4" y1="14" x2="12" y2="14"/>
+          </svg>
+        </div>
+        <div class="sub-text-wrap">
+          <span class="sub-text">サンプルレシートを見る</span>
+          <span class="sub-text-hint">使い方を確認したい方はこちら</span>
+        </div>
+        <span class="sub-arrow">›</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="bot-nav">
+    <!-- Tab: わける (active) -->
+    <div class="tab active">
+      <svg width="22" height="20" viewBox="0 0 22 20" fill="none" stroke="#D4714E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 9L11 1l10 8"/>
+        <path d="M3 7.8V18c0 .6.4 1 1 1h4v-5h6v5h4c.6 0 1-.4 1-1V7.8"/>
+      </svg>
+      <span class="tab-label">わける</span>
+    </div>
+    <!-- Tab: 履歴 -->
+    <div class="tab">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#B8AFA8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10" cy="10" r="8.5"/>
+        <path d="M10 5.5V10l3 3"/>
+        <path d="M3.5 3.5 L1 1" opacity="0.4"/>
+      </svg>
+      <span class="tab-label">履歴</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ── People stepper ── */
+  let n = 3;
+  function render() {
+    document.getElementById('nv').textContent = n;
+    document.getElementById('btnM').disabled = n <= 2;
+    document.getElementById('btnP').disabled = n >= 8;
+  }
+  function ch(d) { n = Math.max(2, Math.min(8, n + d)); render(); }
+  render();
+
+  /* ── Camera trigger ── */
+  function triggerCamera() {
+    document.getElementById('camInput').click();
+  }
+  function onPhoto(input) {
+    if (input.files && input.files[0]) {
+      /* 本実装ではここでAI解析へ渡す */
+      alert('写真を取得しました。\n本実装ではここでレシート解析を行います。');
+      input.value = '';
+    }
+  }
+</script>
+</body>
+</html>

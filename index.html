@@ -952,19 +952,28 @@
     }
     .paid-toast.show { opacity: 1; }
 
-    /* CTAボタン */
-    .btn-start {
+    /* CTAボタン行 */
+    .btn-cta-row {
+      display: flex;
+      gap: 10px;
       width: 100%;
       max-width: 320px;
-      padding: 20px 28px;
+      animation: sdFadeRise 0.55s 0.56s ease both;
+    }
+
+    .btn-start {
+      flex: 1;
+      min-width: 0;
+      padding: 20px 16px;
       background: linear-gradient(145deg, #D4703E 0%, #C9673A 55%, #BE5D32 100%);
       color: #fff;
       border: none;
       border-radius: 100px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
       font-family: inherit;
-      letter-spacing: 2.5px;
+      letter-spacing: 1.5px;
+      white-space: nowrap;
       cursor: pointer;
       box-shadow:
         0 10px 30px rgba(201,103,58,0.36),
@@ -976,8 +985,32 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      animation: sdFadeRise 0.55s 0.56s ease both;
+      gap: 8px;
+    }
+
+    /* 履歴ボタン */
+    .btn-history {
+      flex: 0 0 auto;
+      padding: 20px 16px;
+      background: rgba(201,103,58,0.10);
+      color: #C9673A;
+      border: 2px solid rgba(201,103,58,0.22);
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .btn-history:active {
+      transform: scale(0.97);
+      background: rgba(201,103,58,0.16);
     }
     .btn-start::before {
       content: '';
@@ -993,6 +1026,7 @@
       box-shadow: 0 4px 14px rgba(201,103,58,0.28);
     }
     .btn-start-icon { font-size: 17px; }
+    .btn-history-icon { font-size: 15px; line-height: 1; }
 
     /* フッター */
     .start-footer {
@@ -1282,10 +1316,19 @@
   </div>
   <div class="paid-toast" id="paidToast">有料版で利用できます</div>
 
-  <button class="btn-start" id="btnGoUpload">
-    <span class="btn-start-icon">🧾</span>
-    <span>レシートを読み込む</span>
-  </button>
+  <div class="btn-cta-row">
+    <button class="btn-start" id="btnGoUpload">
+      <span class="btn-start-icon">🧾</span>
+      <span>レシートを読み込む</span>
+    </button>
+    <button class="btn-history" id="btnHistory">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="10" cy="10" r="8.5"/>
+        <path d="M10 6v4l2.5 2.5"/>
+      </svg>
+      <span>履歴</span>
+    </button>
+  </div>
   <div class="start-footer">まずはレシートの写真を用意してね</div>
 </div>
 
