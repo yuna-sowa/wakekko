@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>わけっこ - 試作</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Zen Maru Gothic', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: #fff;
+      color: #1A1A1A;
+      min-height: 100vh;
+    }
+
+    .screen {
+      min-height: 100vh;
+      max-width: 390px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 32px 52px;
+    }
+
+    /* ── ロゴ ── */
+    .app-logo {
+      margin-top: 60px;
+      font-size: 20px;
+      font-weight: 900;
+      color: #C9673A;
+      letter-spacing: 8px;
+      text-indent: 8px;
+    }
+
+    /* ── イラスト ── */
+    .hero {
+      margin: 40px 0 36px;
+      width: 240px;
+      height: 198px;
+    }
+
+    /* ── テキスト ── */
+    .headline {
+      font-size: 22px;
+      font-weight: 900;
+      color: #1A1A1A;
+      text-align: center;
+      line-height: 1.7;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .subline {
+      font-size: 13px;
+      font-weight: 500;
+      color: #B8A89C;
+      text-align: center;
+      letter-spacing: 0.8px;
+    }
+
+    /* ── スペーサー ── */
+    .spacer { flex: 1; min-height: 36px; }
+
+    /* ── 人数選択 ── */
+    .member-section {
+      width: 100%;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+    .member-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #C8B8AC;
+      letter-spacing: 2.5px;
+      margin-bottom: 16px;
+    }
+    .stepper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+    }
+    .stepper-btn {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1.5px solid #EDE4DA;
+      background: #fff;
+      font-size: 22px;
+      color: #C9673A;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      line-height: 1;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .stepper-btn:not(:disabled):active {
+      border-color: #C9673A;
+      background: #FFF4EE;
+    }
+    .stepper-btn:disabled { color: #DDD; cursor: default; }
+    .stepper-display {
+      font-size: 38px;
+      font-weight: 900;
+      color: #1A1A1A;
+      min-width: 84px;
+      text-align: center;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .stepper-unit {
+      font-size: 18px;
+      font-weight: 700;
+      color: #B8A89C;
+    }
+
+    /* ── メインボタン ── */
+    .btn-primary {
+      width: 100%;
+      padding: 20px 24px;
+      background: #C9673A;
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      box-shadow: 0 8px 28px rgba(201,103,58,0.30);
+      transition: transform 0.12s, box-shadow 0.12s;
+      margin-bottom: 16px;
+    }
+    .btn-primary:active {
+      transform: scale(0.97);
+      box-shadow: 0 4px 14px rgba(201,103,58,0.20);
+    }
+
+    /* ── 履歴リンク ── */
+    .btn-history {
+      background: none;
+      border: none;
+      color: #C0AFA4;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1px;
+      cursor: pointer;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-history:active { opacity: 0.6; }
+  </style>
+</head>
+<body>
+
+<div class="screen">
+
+  <div class="app-logo">わけっこ</div>
+
+  <!-- イラスト -->
+  <svg class="hero" viewBox="0 0 240 198" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="card-shadow" x="-30%" y="-30%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#C9673A" flood-opacity="0.10"/>
+      </filter>
+    </defs>
+
+    <!-- 3人のアバター -->
+    <!-- 左: 自分 (ピンク) -->
+    <circle cx="78" cy="76" r="36" fill="#FFF0EB" stroke="white" stroke-width="3"/>
+    <circle cx="78" cy="62" r="12" fill="#EEA090"/>
+    <ellipse cx="78" cy="90" rx="18" ry="9" fill="#EEA090"/>
+
+    <!-- 右: Bさん (ラベンダー) -->
+    <circle cx="162" cy="76" r="36" fill="#F2EFF9" stroke="white" stroke-width="3"/>
+    <circle cx="162" cy="62" r="12" fill="#B0A0CC"/>
+    <ellipse cx="162" cy="90" rx="18" ry="9" fill="#B0A0CC"/>
+
+    <!-- 中央: Aさん (ミント) — 最前面 -->
+    <circle cx="120" cy="58" r="36" fill="#ECF9F5" stroke="white" stroke-width="3"/>
+    <circle cx="120" cy="44" r="12" fill="#7EC0AF"/>
+    <ellipse cx="120" cy="72" rx="18" ry="9" fill="#7EC0AF"/>
+
+    <!-- レシートカード -->
+    <rect x="52" y="118" width="136" height="74" rx="10" fill="white" filter="url(#card-shadow)"/>
+
+    <!-- パーフォレーション線 -->
+    <line x1="52" y1="134" x2="188" y2="134" stroke="#F5ECE5" stroke-width="1.5" stroke-dasharray="5 4"/>
+
+    <!-- 商品行 1 -->
+    <rect x="64" y="146" width="66" height="5" rx="2.5" fill="#EDE5DC"/>
+    <rect x="156" y="146" width="20" height="5" rx="2.5" fill="#C9673A" opacity="0.38"/>
+
+    <!-- 商品行 2 -->
+    <rect x="64" y="159" width="52" height="5" rx="2.5" fill="#EDE5DC"/>
+    <rect x="156" y="159" width="20" height="5" rx="2.5" fill="#C9673A" opacity="0.38"/>
+
+    <!-- 区切り線 -->
+    <line x1="64" y1="172" x2="176" y2="172" stroke="#F0E6DE" stroke-width="1"/>
+
+    <!-- 合計 -->
+    <rect x="64" y="179" width="36" height="7" rx="3.5" fill="#EDE5DC"/>
+    <rect x="136" y="179" width="40" height="7" rx="3.5" fill="#C9673A"/>
+  </svg>
+
+  <h1 class="headline">レシートを撮って<br>みんなで割り勘</h1>
+  <p class="subline">写真1枚で自動計算</p>
+
+  <div class="spacer"></div>
+
+  <div class="member-section">
+    <div class="member-label">何人で割り勘？</div>
+    <div class="stepper">
+      <button class="stepper-btn" id="btnMinus" disabled>−</button>
+      <div class="stepper-display">
+        <span id="count">2</span><span class="stepper-unit">人</span>
+      </div>
+      <button class="stepper-btn" id="btnPlus">＋</button>
+    </div>
+  </div>
+
+  <button class="btn-primary">🧾　レシートを読み込む</button>
+
+  <button class="btn-history">
+    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="10" r="8.5"/>
+      <path d="M10 6v4l2.5 2.5"/>
+    </svg>
+    履歴を見る
+  </button>
+
+</div>
+
+<script>
+  let n = Math.min(parseInt(localStorage.getItem('memberCount') || '2'), 4);
+  const el = document.getElementById('count');
+  const minus = document.getElementById('btnMinus');
+  const plus  = document.getElementById('btnPlus');
+
+  function update() {
+    el.textContent = n;
+    minus.disabled = n <= 2;
+    plus.textContent = n >= 4 ? '🔒' : '＋';
+    localStorage.setItem('memberCount', n);
+  }
+
+  minus.addEventListener('click', () => { if (n > 2) { n--; update(); } });
+  plus.addEventListener('click',  () => { if (n < 4) { n++; update(); } });
+
+  update();
+</script>
+</body>
+</html>
