@@ -2031,7 +2031,9 @@ ${text}`;
       }
     }
     editingState = null;
-    render();
+    // blur が click より先に発火してDOMを作り直すと、タップ先ボタンが消えて空振りになるため
+    // 1フレーム遅らせてクリックイベントを先に処理させる
+    requestAnimationFrame(render);
   }
 
   function cancelEdit() {
