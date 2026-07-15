@@ -1190,23 +1190,6 @@
       flex-direction: column;
     }
     .h-detail-all-items .h-item-row { margin-bottom: 8px; }
-    .h-detail-restore-btn {
-      width: 100%;
-      padding: 15px;
-      background: linear-gradient(145deg, #D4703E 0%, #C9673A 55%, #BE5D32 100%);
-      color: #fff;
-      border: none;
-      border-radius: 100px;
-      font-size: 14px;
-      font-weight: 700;
-      font-family: inherit;
-      letter-spacing: 1.5px;
-      cursor: pointer;
-      transition: opacity 0.15s;
-      margin-top: 8px;
-    }
-    .h-detail-restore-btn:active { opacity: 0.8; }
-
     /* ========== レシート読み込み画面 ========== */
     #screen-upload {
       min-height: 100vh;
@@ -1637,6 +1620,7 @@
   let selectedFile = null;
   let currentParsedResult = null; // OCR解析結果を保持するグローバル変数
   let receiptTotal = 0; // OCRで取得したレシート合計金額（差額按分に使用）
+  let currentHistoryId = null; // 現在のセッションに対応する履歴エントリのID
 
   // ── ユーティリティ ────────────────────────────────────────────
 
@@ -2403,14 +2387,43 @@ ${text}`;
   function saveToHistory(result) {
     if (!result || !result.items || result.items.length === 0) return;
     const history = loadHistory();
+    currentHistoryId = Date.now();
     history.unshift({
-      id: Date.now(),
+      id: currentHistoryId,
       date: new Date().toISOString(),
       storeName: result.storeName || '',
       totalAmount: result.totalAmount || 0,
       items: result.items.map(it => ({ name: it.name, price: it.price, quantity: it.quantity || 1 })),
     });
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, HISTORY_MAX)));
+  }
+
+  function calcCurrentTotals() {
+    const rawTotals = {};
+    MEMBERS.forEach(m => (rawTotals[m.key] = 0));
+    items.forEach((item, idx) => {
+      const sh = calcShares(item, idx);
+      MEMBERS.forEach(m => (rawTotals[m.key] += sh[m.key]));
+    });
+    const hasUnassignedQty = items.some(it =>
+      it.quantity > 1 && it.useQtyMode && !it.splitAll &&
+      MEMBERS.reduce((s, m) => s + (it.qty?.[m.key] || 0), 0) < it.quantity
+    );
+    if (receiptTotal > 0 && !hasUnassignedQty) {
+      return calcSplitByReceipt(items, receiptTotal).finals;
+    }
+    return rawTotals;
+  }
+
+  function updateHistorySplitResult() {
+    if (!currentHistoryId || items.length === 0) return;
+    const history = loadHistory();
+    const entry = history.find(e => e.id === currentHistoryId);
+    if (!entry) return;
+    entry.splitTotals = calcCurrentTotals();
+    entry.members = MEMBERS.map(m => ({ key: m.key, label: m.label, box: m.box }));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    currentHistoryId = null;
   }
 
   function loadHistory() {
@@ -2476,9 +2489,22 @@ ${text}`;
   window.showHistoryDetail = function(idx) {
     const entry = loadHistory()[idx];
     if (!entry) return;
+
+    let splitHtml = '';
+    if (entry.splitTotals && entry.members && entry.members.length > 0) {
+      const boxes = entry.members.map(m =>
+        `<div class="total-box ${m.box}">`
+        + `<div class="total-name">${esc(m.label)}</div>`
+        + `<div class="total-yen">¥${(entry.splitTotals[m.key] || 0).toLocaleString()}</div>`
+        + `</div>`
+      ).join('');
+      splitHtml = `<div class="totals-grid" style="margin-bottom:16px">${boxes}</div>`;
+    }
+
     const allItems = entry.items
       .map(it => `<div class="h-item-row"><span class="h-item-name">${esc(it.name)}</span><span class="h-item-price">¥${it.price.toLocaleString()}</span></div>`)
       .join('');
+
     $('historyDetailBody').innerHTML = `
       <div class="history-card">
         <div class="h-meta">
@@ -2486,8 +2512,8 @@ ${text}`;
           <span class="h-total">¥${entry.totalAmount.toLocaleString()}</span>
         </div>
         <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
+        ${splitHtml}
         <div class="h-items h-detail-all-items">${allItems}</div>
-        <button class="h-detail-restore-btn" onclick="restoreHistory(${idx})">この内容で割り勘する →</button>
       </div>`;
     showScreen('screen-history-detail');
   };
@@ -2502,8 +2528,11 @@ ${text}`;
     showScreen('screen-history');
   });
 
-  // もどるボタン → スタート画面へ
-  $('btnBack').addEventListener('click', () => showScreen('screen-start'));
+  // もどるボタン → スタート画面へ（割り勘結果を履歴に保存してから遷移）
+  $('btnBack').addEventListener('click', () => {
+    updateHistorySplitResult();
+    showScreen('screen-start');
+  });
 
   // ── カメラ画面 ────────────────────────────────────────────────
   let cameraStream = null;
