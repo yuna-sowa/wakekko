@@ -1166,6 +1166,46 @@
       transition: opacity 0.15s;
     }
     .h-restore-btn:active { opacity: 0.8; }
+    .h-detail-btn {
+      width: 100%;
+      padding: 13px;
+      background: #fff;
+      color: #C9673A;
+      border: 2px solid #C9673A;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .h-detail-btn:active { opacity: 0.8; }
+
+    /* ========== 履歴詳細画面 ========== */
+    #screen-history-detail {
+      min-height: 100vh;
+      background: #FFF5F5;
+      display: none;
+      flex-direction: column;
+    }
+    .h-detail-all-items .h-item-row { margin-bottom: 8px; }
+    .h-detail-restore-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(145deg, #D4703E 0%, #C9673A 55%, #BE5D32 100%);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 8px;
+    }
+    .h-detail-restore-btn:active { opacity: 0.8; }
 
     /* ========== レシート読み込み画面 ========== */
     #screen-upload {
@@ -1480,6 +1520,15 @@
   <div class="history-body" id="historyBody"></div>
 </div>
 
+<!-- ========== 履歴詳細画面 ========== -->
+<div id="screen-history-detail">
+  <div class="history-header">
+    <button class="btn-back" id="btnHistoryDetailBack">← もどる</button>
+    <div class="history-page-title">詳細</div>
+  </div>
+  <div class="history-body" id="historyDetailBody"></div>
+</div>
+
 <!-- ========== レシート読み込み画面 ========== -->
 <div id="screen-upload">
   <div class="upload-header">
@@ -1607,12 +1656,12 @@
 
   // ── 画面切替 ──────────────────────────────────────────────────
   function showScreen(id) {
-    ['screen-start', 'screen-upload', 'screen-main', 'screen-camera', 'screen-history'].forEach(s => {
+    ['screen-start', 'screen-upload', 'screen-main', 'screen-camera', 'screen-history', 'screen-history-detail'].forEach(s => {
       const el = $(s);
       if (el) el.style.display = 'none';
     });
     const target = $(id);
-    if (target) target.style.display = ['screen-start', 'screen-upload', 'screen-camera', 'screen-history'].includes(id) ? 'flex' : 'block';
+    if (target) target.style.display = ['screen-start', 'screen-upload', 'screen-camera', 'screen-history', 'screen-history-detail'].includes(id) ? 'flex' : 'block';
   }
 
   // ── OCR ──────────────────────────────────────────────────────
@@ -2400,7 +2449,7 @@ ${text}`;
           </div>
           <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
           <div class="h-items">${preview}${more}</div>
-          <button class="h-restore-btn" onclick="restoreHistory(${i})">この内容で割り勘する →</button>
+          <button class="h-detail-btn" onclick="showHistoryDetail(${i})">詳細を見る →</button>
         </div>`;
     }).join('');
   }
@@ -2424,11 +2473,34 @@ ${text}`;
     showScreen('screen-main');
   };
 
+  window.showHistoryDetail = function(idx) {
+    const entry = loadHistory()[idx];
+    if (!entry) return;
+    const allItems = entry.items
+      .map(it => `<div class="h-item-row"><span class="h-item-name">${esc(it.name)}</span><span class="h-item-price">¥${it.price.toLocaleString()}</span></div>`)
+      .join('');
+    $('historyDetailBody').innerHTML = `
+      <div class="history-card">
+        <div class="h-meta">
+          <span class="h-date">${formatHistoryDate(entry.date)}</span>
+          <span class="h-total">¥${entry.totalAmount.toLocaleString()}</span>
+        </div>
+        <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
+        <div class="h-items h-detail-all-items">${allItems}</div>
+        <button class="h-detail-restore-btn" onclick="restoreHistory(${idx})">この内容で割り勘する →</button>
+      </div>`;
+    showScreen('screen-history-detail');
+  };
+
   $('btnHistory').addEventListener('click', () => {
     renderHistory();
     showScreen('screen-history');
   });
   $('btnHistoryBack').addEventListener('click', () => showScreen('screen-start'));
+  $('btnHistoryDetailBack').addEventListener('click', () => {
+    renderHistory();
+    showScreen('screen-history');
+  });
 
   // もどるボタン → スタート画面へ
   $('btnBack').addEventListener('click', () => showScreen('screen-start'));
