@@ -1191,8 +1191,8 @@
     }
     .h-restore-btn:active { opacity: 0.8; }
     .h-detail-btn {
-      width: 100%;
-      padding: 13px;
+      width: auto;
+      padding: 10px 24px;
       background: #fff;
       color: #C9673A;
       border: 2px solid #C9673A;
@@ -2488,7 +2488,7 @@ ${text}`;
           </div>
           <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
           <div class="h-items">${preview}${more}</div>
-          <button class="h-detail-btn" onclick="showHistoryDetail(${i})">詳細を見る →</button>
+          <button class="h-detail-btn" onclick="showHistoryDetail(${i})">詳細を見る</button>
         </div>`;
     }).join('');
   }
