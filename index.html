@@ -26,6 +26,12 @@
       text-align: center;
       padding: 40px 16px 36px;
       border-bottom: 2px solid #E8D8CC;
+      position: relative;
+    }
+    .header .btn-back {
+      position: absolute;
+      left: 16px;
+      top: 18px;
     }
     .logo {
       font-size: 30px;
@@ -573,6 +579,24 @@
       padding: 40px 0;
       font-size: 13px;
     }
+
+    .btn-share {
+      width: 100%;
+      padding: 14px;
+      margin-top: 20px;
+      background: linear-gradient(145deg, #D4703E 0%, #C9673A 55%, #BE5D32 100%);
+      color: #fff;
+      border: none;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-share:active { opacity: 0.8; }
+    .btn-share:disabled { background: #ddd; cursor: default; }
 
     /* ========== クリアボタン ========== */
     .btn-clear {
@@ -1551,6 +1575,7 @@
 <!-- ========== メイン画面 ========== -->
 <div id="screen-main">
 <div class="header">
+  <button class="btn-back" id="btnMainBack">← もどる</button>
   <div class="logo">わけっこ</div>
   <div class="logo-sub">みんなでかんたん割り勘</div>
 </div>
@@ -1586,6 +1611,7 @@
       <div id="resultContent">
         <div class="result-empty">商品を追加するとここに結果が表示されます</div>
       </div>
+      <button class="btn-share" id="btnShare">結果を共有する</button>
     </div>
   </div>
 </div>
@@ -2528,10 +2554,37 @@ ${text}`;
     showScreen('screen-history');
   });
 
-  // もどるボタン → スタート画面へ（割り勘結果を履歴に保存してから遷移）
-  $('btnBack').addEventListener('click', () => {
+  // アップロード画面のもどるボタン
+  $('btnBack').addEventListener('click', () => showScreen('screen-start'));
+
+  // メイン画面のもどるボタン
+  $('btnMainBack').addEventListener('click', () => showScreen('screen-start'));
+
+  // 共有ボタン
+  $('btnShare').addEventListener('click', async () => {
+    if (items.length === 0) return;
+
     updateHistorySplitResult();
-    showScreen('screen-start');
+    const totals = calcCurrentTotals();
+
+    const dateStr = new Date().toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+    const storeName = currentParsedResult?.storeName || '';
+    const storeStr = storeName ? `\n${storeName}` : '';
+
+    const itemLines = items.map(it => `${it.name}　¥${it.price.toLocaleString()}`).join('\n');
+    const memberLines = MEMBERS.map(m => `${m.label}　→　¥${totals[m.key].toLocaleString()}`).join('\n');
+
+    const text = `わけっこ結果 🧾\n${dateStr}${storeStr}\n\n【品目】\n${itemLines}\n\n【割り勘】\n${memberLines}`;
+
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch (e) { /* キャンセル等 */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      const btn = $('btnShare');
+      const orig = btn.textContent;
+      btn.textContent = 'コピーしました！';
+      setTimeout(() => { btn.textContent = orig; }, 2000);
+    }
   });
 
   // ── カメラ画面 ────────────────────────────────────────────────
