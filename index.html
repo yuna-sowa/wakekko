@@ -1668,6 +1668,9 @@
 
   // ── 画面切替 ──────────────────────────────────────────────────
   function showScreen(id) {
+    if (id !== 'screen-main' && $('screen-main')?.style.display !== 'none') {
+      updateHistorySplitResult();
+    }
     ['screen-start', 'screen-upload', 'screen-main', 'screen-camera', 'screen-history', 'screen-history-detail'].forEach(s => {
       const el = $(s);
       if (el) el.style.display = 'none';
