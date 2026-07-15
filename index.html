@@ -2454,8 +2454,11 @@ ${text}`;
     entry.splitTotals = calcCurrentTotals();
     entry.members = MEMBERS.map(m => ({ key: m.key, label: m.label, box: m.box }));
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-    currentHistoryId = null;
   }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') updateHistorySplitResult();
+  });
 
   function loadHistory() {
     try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
