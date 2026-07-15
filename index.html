@@ -2533,6 +2533,10 @@ ${text}`;
       .map(it => `<div class="h-item-row"><span class="h-item-name">${esc(it.name)}</span><span class="h-item-price">¥${it.price.toLocaleString()}</span></div>`)
       .join('');
 
+    const shareBtn = (entry.splitTotals && entry.members)
+      ? `<button class="btn-share" style="margin-top:20px" onclick="shareHistoryEntry(${idx})">結果を共有する</button>`
+      : '';
+
     $('historyDetailBody').innerHTML = `
       <div class="history-card">
         <div class="h-meta">
@@ -2542,8 +2546,33 @@ ${text}`;
         <div class="h-store">${esc(entry.storeName) || '店名不明'}</div>
         ${splitHtml}
         <div class="h-items h-detail-all-items">${allItems}</div>
+        ${shareBtn}
       </div>`;
     showScreen('screen-history-detail');
+  };
+
+  window.shareHistoryEntry = async function(idx) {
+    const entry = loadHistory()[idx];
+    if (!entry || !entry.splitTotals || !entry.members) return;
+
+    const dateStr = new Date(entry.date).toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+    const storeStr = entry.storeName ? `\n${entry.storeName}` : '';
+    const itemLines = entry.items.map(it => `${it.name}　¥${it.price.toLocaleString()}`).join('\n');
+    const memberLines = entry.members.map(m => `${m.label}　→　¥${(entry.splitTotals[m.key] || 0).toLocaleString()}`).join('\n');
+
+    const text = `わけっこ　割り勘結果 🧾\n${dateStr}${storeStr}\n\n【品目】\n${itemLines}\n\n【割り勘】\n${memberLines}`;
+
+    if (navigator.share) {
+      try { await navigator.share({ text }); } catch (e) {}
+    } else {
+      await navigator.clipboard.writeText(text);
+      const btn = document.querySelector('#historyDetailBody .btn-share');
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'コピーしました！';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      }
+    }
   };
 
   $('btnHistory').addEventListener('click', () => {
