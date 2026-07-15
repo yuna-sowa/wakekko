@@ -2471,7 +2471,7 @@ ${text}`;
     if (diff < 3600)  return `${Math.floor(diff / 60)}分前`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}時間前`;
     const days = Math.floor(diff / 86400);
-    if (days < 7)     return `${days}日前`;
+    if (days <= 3)    return `${days}日前`;
     return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
   }
 
